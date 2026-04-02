@@ -8,18 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     
-    <!-- LIBRERÍAS DE FIREBASE -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script><!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Draft FIFA PRO - Online Multiplayer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
-    <!-- LIBRERÍAS DE FIREBASE -->
+    <!-- LIBRERÍAS DE FIREBASE (Versión 8 para que sea fácil de copiar y pegar) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -120,7 +109,7 @@
     <!-- 3. LOBBY DE ESPERA -->
     <div id="lobby-screen" class="hidden glass p-10 max-w-xl w-full text-center relative z-10">
         <h2 class="text-3xl font-bold mb-2">Sala: <span id="lobby-code-display" class="text-blue-400 tracking-widest font-mono">ABCD</span></h2>
-        <p class="text-gray-400 mb-6">Esperando a que entren tus amigos...</p>
+        <p class="text-gray-400 mb-6">Esperando jugadores...</p>
 
         <button onclick="copyInviteLink()" class="mb-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded border border-white/20 text-sm transition">
             <i class="fas fa-link text-blue-400"></i> Copiar enlace de invitación
@@ -133,12 +122,13 @@
             </ul>
         </div>
 
+        <!-- Solo visible para el Host -->
         <div id="host-controls" class="hidden flex flex-col gap-3">
             <button onclick="addBot()" class="w-full glass-button text-white py-2 rounded-lg text-sm border-yellow-500/50 hover:bg-yellow-500/20">
-                <i class="fas fa-robot text-yellow-500"></i> Añadir Bot (Opcional)
+                <i class="fas fa-robot text-yellow-500"></i> Añadir Bot a la sala
             </button>
             <button onclick="startOnlineDraft()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.5)]">
-                <i class="fas fa-play"></i> ¡Sortear Turnos y Comenzar!
+                <i class="fas fa-play"></i> ¡Comenzar Draft!
             </button>
         </div>
         <div id="guest-controls" class="text-yellow-400 animate-pulse text-sm">
@@ -148,6 +138,7 @@
 
     <!-- 4. PANTALLA PRINCIPAL DEL DRAFT -->
     <div id="draft-screen" class="hidden w-full max-w-7xl flex-col gap-4 relative z-10">
+        <!-- HEADER -->
         <div id="draft-header" class="glass p-4 flex flex-col md:flex-row justify-between items-center transition-all">
             <div class="flex items-center gap-4 mb-4 md:mb-0">
                 <div class="text-sm text-gray-400">Ronda <span id="round-indicator" class="text-white font-bold text-lg">1</span></div>
@@ -160,6 +151,7 @@
             </div>
         </div>
 
+        <!-- JUMBOTRON -->
         <div id="jumbotron" class="glass w-full p-6 text-center hidden relative overflow-hidden transition-all duration-500">
             <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 animate-pulse"></div>
             <div class="relative z-10 text-xl font-extrabold uppercase text-white">Pick <span id="jumbo-pick" class="text-blue-400">#1</span></div>
@@ -171,6 +163,7 @@
             <div id="jumbo-pos" class="relative z-10 text-lg font-bold text-blue-300 mt-4 opacity-0 transition-opacity">en la posición de <span id="jumbo-pos-text" class="text-white underline">MC</span></div>
         </div>
 
+        <!-- AREA DE JUEGO -->
         <div class="flex flex-col lg:flex-row gap-6 h-[700px]" id="play-area">
             <div class="w-full lg:w-7/12 flex flex-col gap-4">
                 <div class="glass p-2 flex gap-2 overflow-x-auto" id="team-tabs"></div>
@@ -213,24 +206,31 @@
         </div>
     </div>
 
-    <!-- PANTALLA FINAL (Adaptada en Cuadrícula para múltiples personas) -->
-    <div id="end-screen" class="hidden w-full max-w-7xl flex-col gap-6 relative z-10">
-        <h1 class="text-4xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-2">RESULTADOS DEL DRAFT</h1>
-        <!-- Utilizamos un grid que se adapta a más columnas según la pantalla -->
-        <div id="final-pitches-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full"></div>
-    </div>
+    <!-- PANTALLA FINAL -->
+    <div id="end-screen" class="hidden w-full max-w-7xl flex-col gap-6 relative z-10"><div id="final-pitches-container" class="flex flex-col xl:flex-row justify-center flex-wrap gap-6 w-full"></div></div>
 
 <script>
-    let availablePlayers = []; 
-    let localTakenPlayers = {}; 
+    // ==========================================
+    // VARIABLES ONLINE Y ESTADO
+    // ==========================================
+    let availablePlayers = []; // Todos los del CSV
+    let localTakenPlayers = {}; // Para filtrarlos rápido de la lista
     
-    let myUserId = "uid_" + Math.random().toString(36).substr(2, 9); 
+    let myUserId = "uid_" + Math.random().toString(36).substr(2, 9); // Mi ID único
     let currentRoomId = null;
     let roomRef = null;
     let isHost = false;
     
+    // Estado sincronizado desde Firebase
     let serverState = {
-        status: 'lobby', host: null, users: {}, draftOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}, reveal: null
+        status: 'lobby',
+        host: null,
+        users: {},
+        draftOrder: [],
+        currentPickIndex: 0,
+        turnEndTime: 0,
+        takenPlayers: {},
+        reveal: null
     };
 
     let viewingUserId = myUserId; 
@@ -264,9 +264,15 @@
         <div class="flex justify-around w-full z-10"><div class="player-card" id="${prefix}-POR" onclick="selectPitchSlot('${prefix}', 'POR')"><span class="text-gray-400 text-xs font-bold">POR</span></div></div>
     `;
 
+    // ==========================================
+    // 1. CARGA DE CSV Y AUTO-JOIN
+    // ==========================================
     window.onload = () => {
+        // Comprobar si me han pasado un link con código de sala (ej: ?room=1234)
         const urlParams = new URLSearchParams(window.location.search);
-        if(urlParams.has('room')) document.getElementById('input-roomcode').value = urlParams.get('room');
+        if(urlParams.has('room')) {
+            document.getElementById('input-roomcode').value = urlParams.get('room');
+        }
     };
 
     function loadCSV(event) {
@@ -294,25 +300,40 @@
         const nick = document.getElementById('input-nick').value.trim();
         const team = document.getElementById('input-team').value.trim();
         if(!nick || !team) return alert("Rellena Nick y Nombre de Equipo");
+        
         document.getElementById('step1-screen').classList.add('hidden');
         document.getElementById('step2-screen').classList.remove('hidden');
     }
 
+    // ==========================================
+    // 2. LÓGICA DE SALA ONLINE (FIREBASE)
+    // ==========================================
     function createRoom() {
-        if(!db) return alert("Firebase no configurado. Asegúrate de poner tus credenciales en el HTML.");
+        if(!db) return alert("Firebase no configurado. Pon tus credenciales en el código HTML.");
         isHost = true;
-        currentRoomId = Math.random().toString(36).substr(2, 4).toUpperCase(); 
+        currentRoomId = Math.random().toString(36).substr(2, 4).toUpperCase(); // Genera ej: "A4X9"
         
         const nick = document.getElementById('input-nick').value.trim();
         const team = document.getElementById('input-team').value.trim();
 
         roomRef = db.ref('rooms/' + currentRoomId);
+        
+        // Estructura inicial en Firebase
         roomRef.set({
-            status: 'lobby', host: myUserId,
-            users: { [myUserId]: { id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false } },
-            draftOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}
+            status: 'lobby',
+            host: myUserId,
+            users: {
+                [myUserId]: { id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false }
+            },
+            draftOrder: [],
+            currentPickIndex: 0,
+            turnEndTime: 0,
+            takenPlayers: {}
         }).then(() => {
-            enterLobbyUI(); listenToServer(); roomRef.onDisconnect().remove();
+            enterLobbyUI();
+            listenToServer();
+            // Borrar la sala cuando el Host cierre la pestaña
+            roomRef.onDisconnect().remove();
         });
     }
 
@@ -320,8 +341,10 @@
         if(!db) return alert("Firebase no configurado.");
         currentRoomId = document.getElementById('input-roomcode').value.trim().toUpperCase();
         if(!currentRoomId) return alert("Introduce un código.");
+
         roomRef = db.ref('rooms/' + currentRoomId);
         
+        // Verificar si existe y está en lobby
         roomRef.once('value').then(snap => {
             const data = snap.val();
             if(!data) return alert("La sala no existe.");
@@ -330,10 +353,14 @@
             const nick = document.getElementById('input-nick').value.trim();
             const team = document.getElementById('input-team').value.trim();
 
+            // Me añado a Firebase
             roomRef.child('users').child(myUserId).set({
                 id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false
             }).then(() => {
-                enterLobbyUI(); listenToServer(); roomRef.child('users').child(myUserId).onDisconnect().remove();
+                enterLobbyUI();
+                listenToServer();
+                // Si me desconecto, me borro
+                roomRef.child('users').child(myUserId).onDisconnect().remove();
             });
         });
     }
@@ -342,6 +369,7 @@
         document.getElementById('step2-screen').classList.add('hidden');
         document.getElementById('lobby-screen').classList.remove('hidden');
         document.getElementById('lobby-code-display').innerText = currentRoomId;
+        
         if(isHost) {
             document.getElementById('host-controls').classList.remove('hidden');
             document.getElementById('host-controls').classList.add('flex');
@@ -356,17 +384,20 @@
 
     function addBot() {
         const botId = "bot_" + Math.random().toString(36).substr(2, 5);
+        const botNames = ["Real Bot", "Bot City FC", "Inter de Bot", "Bayern Bot"];
         roomRef.child('users').child(botId).set({
-            id: botId, nick: "Bot " + botCounter, teamName: "CPU " + botCounter, team: emptyTeam(), isBot: true
+            id: botId,
+            nick: "Bot " + botCounter,
+            teamName: botNames[botCounter % 4],
+            team: emptyTeam(),
+            isBot: true
         });
         botCounter++;
     }
 
     function startOnlineDraft() {
-        // SORTEO DE USUARIOS PARA FAIR PLAY
+        // Generar orden Snake
         let userIds = Object.keys(serverState.users);
-        userIds = userIds.sort(() => Math.random() - 0.5); // Sorteo aleatorio de posiciones
-
         let order = [];
         for (let round = 1; round <= maxRounds; round++) {
             let roundOrder = [...userIds];
@@ -374,16 +405,26 @@
             order.push(...roundOrder);
         }
 
-        roomRef.update({ status: 'drafting', draftOrder: order, currentPickIndex: 0, turnEndTime: Date.now() + (turnTime * 1000) });
+        roomRef.update({
+            status: 'drafting',
+            draftOrder: order,
+            currentPickIndex: 0,
+            turnEndTime: Date.now() + (turnTime * 1000)
+        });
     }
 
+    // ==========================================
+    // 3. SINCRONIZACIÓN EN TIEMPO REAL
+    // ==========================================
     function listenToServer() {
         roomRef.on('value', snap => {
             const data = snap.val();
-            if(!data) return; 
+            if(!data) return; // Sala borrada
 
             const prevStatus = serverState.status;
             serverState = data;
+            
+            // Actualizar lista de tomados para el filtro local
             localTakenPlayers = data.takenPlayers || {};
 
             if(data.status === 'lobby') {
@@ -391,13 +432,17 @@
             } 
             else if(data.status === 'drafting') {
                 if(prevStatus === 'lobby') {
+                    // Transición de Lobby a Draft
                     document.getElementById('lobby-screen').classList.add('hidden');
                     document.getElementById('draft-screen').classList.remove('hidden');
                     document.getElementById('draft-screen').classList.add('flex');
                     document.getElementById('pitch-container').innerHTML = getPitchHTML("slot");
+                    
+                    // Iniciar mi bucle de reloj local
                     startLocalTimerLoop();
                 }
 
+                // Si hay un evento de revelación nuevo (Animación)
                 if(data.reveal && data.reveal.ts !== (window.lastRevealTs || 0)) {
                     window.lastRevealTs = data.reveal.ts;
                     triggerDramaticReveal(data.reveal);
@@ -428,7 +473,8 @@
         
         const activeUid = serverState.draftOrder[serverState.currentPickIndex];
         const activeUser = serverState.users[activeUid];
-        if(!activeUser) return showEndScreen();
+        
+        if(!activeUser) return showEndScreen(); // Safety
         
         document.getElementById('current-turn-name').innerText = (activeUid === myUserId) ? "¡TU TURNO!" : activeUser.nick;
         
@@ -443,19 +489,23 @@
 
         renderTabs();
         
+        // Pinta el campo del usuario que estoy mirando
         const userToView = serverState.users[viewingUserId] || serverState.users[myUserId];
         fillPitchData(userToView.team, "slot");
         
         renderPlayers();
 
-        // Control de BOTS gestionado por el Host
+        // Control de BOTS (Solo el host los mueve para no duplicar acciones)
         if(isHost && activeUser.isBot) {
+            // Previene que se disparen varios setTimeout si firebase hace syncs rápidos
             if(window.botWorkingForIndex !== serverState.currentPickIndex) {
                 window.botWorkingForIndex = serverState.currentPickIndex;
                 let botThinkingTime = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
                 
                 setTimeout(() => {
+                    // Doble check
                     if (serverState.draftOrder[serverState.currentPickIndex] !== activeUid) return; 
+                    
                     const s = ['DC','EI','ED','MC2','MC1','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !activeUser.team[x]);
                     let available = availablePlayers.filter(p => !localTakenPlayers[p.id]);
                     if(s && available.length > 0) {
@@ -501,15 +551,16 @@
         });
     }
 
-    function togglePosFilter(pos) { const idx = activePosFilters.indexOf(pos); if(idx > -1) activePosFilters.splice(idx, 1); else activePosFilters.push(pos); document.querySelectorAll('.pos-pill').forEach(pill => { if(activePosFilters.includes(pill.innerText)) pill.classList.add('active'); else pill.classList.remove('active'); }); renderPlayers(); }
-    function clearPosFilters() { activePosFilters = []; document.querySelectorAll('.pos-pill').forEach(pill => pill.classList.remove('active')); renderPlayers(); }
-
+    // ==========================================
+    // 4. LÓGICA DE FICHAR ONLINE
+    // ==========================================
     function renderPlayers() {
         const listDiv = document.getElementById('players-list');
         const searchTerm = document.getElementById('search-input').value.toLowerCase();
         const sortBy = document.getElementById('sort-filter').value;
         const isMyTurn = serverState.draftOrder[serverState.currentPickIndex] === myUserId && !isRevealing;
 
+        // Quitar los ya seleccionados globalmente
         let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
 
         let filtered = unpickedPlayers.filter(p => {
@@ -548,6 +599,9 @@
         });
     }
 
+    function togglePosFilter(pos) { const idx = activePosFilters.indexOf(pos); if(idx > -1) activePosFilters.splice(idx, 1); else activePosFilters.push(pos); document.querySelectorAll('.pos-pill').forEach(pill => { if(activePosFilters.includes(pill.innerText)) pill.classList.add('active'); else pill.classList.remove('active'); }); renderPlayers(); }
+    function clearPosFilters() { activePosFilters = []; document.querySelectorAll('.pos-pill').forEach(pill => pill.classList.remove('active')); renderPlayers(); }
+
     function startPlacementDraft(playerId) {
         if(isRevealing) return;
         pendingPlayer = (pendingPlayer && pendingPlayer.id === playerId) ? null : availablePlayers.find(p => p.id === playerId);
@@ -571,16 +625,28 @@
         pushDraftPickToFirebase(pendingPlayer, slotId, myUserId);
     }
 
+    // EL NÚCLEO ONLINE: Escribir a Firebase
     function pushDraftPickToFirebase(player, slotId, userId) {
         let updates = {};
+        // 1. Asignar a usuario
         updates[`users/${userId}/team/${slotId}`] = player;
+        // 2. Marcar como cogido
         updates[`takenPlayers/${player.id}`] = true;
-        updates[`reveal`] = { player: player, slotId: slotId, userId: userId, pickNum: serverState.currentPickIndex + 1, ts: Date.now() };
+        // 3. Crear el evento de revelación para que todos lo vean
+        updates[`reveal`] = {
+            player: player,
+            slotId: slotId,
+            userId: userId,
+            pickNum: serverState.currentPickIndex + 1,
+            ts: Date.now()
+        };
 
+        // Reseteo de UI local al instante
         pendingPlayer = null; 
         document.getElementById('pitch-container').classList.remove('highlight-slots');
         document.getElementById('placement-banner').classList.add('hidden');
 
+        // Enviar a la nube
         roomRef.update(updates);
     }
 
@@ -622,22 +688,33 @@
                     isRevealing = false; 
                     jumbo.classList.add('hidden');
                     
+                    // SOLO EL HOST AVANZA EL TURNO GLOBAL PARA EVITAR BUGS
                     if(isHost) {
                         const nextPick = serverState.currentPickIndex + 1;
-                        if(nextPick >= serverState.draftOrder.length) roomRef.update({ status: 'finished' });
-                        else roomRef.update({ currentPickIndex: nextPick, turnEndTime: Date.now() + (turnTime * 1000) });
+                        if(nextPick >= serverState.draftOrder.length) {
+                            roomRef.update({ status: 'finished' });
+                        } else {
+                            roomRef.update({
+                                currentPickIndex: nextPick,
+                                turnEndTime: Date.now() + (turnTime * 1000)
+                            });
+                        }
                     }
-                }, delay + 2500); 
+                }, delay + 2500); // Dar tiempo a leer
             }, 800);
         }, 500);
     }
 
+    // ==========================================
+    // RELOJ LOCAL (Sincronizado con Host)
+    // ==========================================
     function startLocalTimerLoop() {
         if(localTimerInterval) clearInterval(localTimerInterval);
         
         localTimerInterval = setInterval(() => {
             if(isRevealing || serverState.status !== 'drafting') return;
             
+            // Calculamos el tiempo restante restando la hora final a la hora actual de tu PC
             let msLeft = serverState.turnEndTime - Date.now();
             let secLeft = Math.max(0, Math.floor(msLeft / 1000));
             
@@ -650,6 +727,7 @@
                 timerEl.classList.remove('text-red-500');
             }
 
+            // Si se acaba el tiempo, el Host auto-asigna a quien sea
             if(secLeft === 0 && isHost) {
                 if(window.punishmentTriggered !== serverState.currentPickIndex) {
                     window.punishmentTriggered = serverState.currentPickIndex;
@@ -660,683 +738,12 @@
                     if(s && available.length > 0) pushDraftPickToFirebase(available[0], s, uId);
                 }
             }
-        }, 200);
+        }, 200); // 5 veces por segundo para ser ultra preciso visualmente
     }
 
-    function showEndScreen() {
-        if(localTimerInterval) clearInterval(localTimerInterval);
-        document.getElementById('draft-screen').classList.add('hidden');
-        document.getElementById('draft-screen').classList.remove('flex');
-        const endScreen = document.getElementById('end-screen');
-        endScreen.classList.remove('hidden'); endScreen.classList.add('flex');
-        
-        const cont = document.getElementById('final-pitches-container');
-        cont.innerHTML = '';
-        
-        Object.values(serverState.users).forEach((u, i) => {
-            const d = document.createElement('div'); d.className = 'glass p-4 end-pitch-container';
-            let sum = 0, count = 0; Object.values(u.team).forEach(p => { if(p) { sum += p.rat; count++; } });
-            let avg = count > 0 ? (sum / count).toFixed(1) : "0";
-            
-            d.innerHTML = `
-                <div class="text-xl font-black text-white uppercase text-center truncate mb-1">${u.teamName}</div>
-                <div class="text-gray-400 text-xs text-center mb-4">${u.nick}</div>
-                <div class="bg-black/60 border border-yellow-500 rounded-lg px-4 py-1 mb-4 flex justify-center items-center gap-3">
-                    <span class="text-xs text-yellow-500 uppercase font-bold">Media</span>
-                    <span class="text-2xl font-black text-white">${avg}</span>
-                </div>
-                <div class="pitch w-full" id="final-${i}" style="height:350px"></div>
-            `;
-            cont.appendChild(d);
-            document.getElementById(`final-${i}`).innerHTML = getPitchHTML(`f-${i}`);
-            fillPitchData(u.team, `f-${i}`);
-        });
-    }
-</script>
-</body>
-</html>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-    <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyBvxVC9HyzoO1BxjDG04u_u4INWOH0KBT8",
-    authDomain: "draft-fifa.firebaseapp.com",
-    databaseURL: "https://draft-fifa-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "draft-fifa",
-    storageBucket: "draft-fifa.firebasestorage.app",
-    messagingSenderId: "136150058222",
-    appId: "1:136150058222:web:316660839580bedd221fff",
-    measurementId: "G-BT1BEFCZKJ"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-</script>
-
-    <style>
-        body { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #000000 100%); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh; overflow-x: hidden; }
-        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); border-radius: 16px; }
-        .glass-button { background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); transition: all 0.3s ease; cursor: pointer; }
-        .glass-button:hover:not(:disabled) { background: rgba(59, 130, 246, 0.5); box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); transform: translateY(-2px); }
-        .glass-button:disabled { opacity: 0.3; cursor: not-allowed; }
-        
-        .pitch { position: relative; background: rgba(0, 0, 0, 0.2); border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 8px; height: 600px; width: 100%; display: flex; flex-direction: column; justify-content: space-around; overflow: hidden; }
-        .pitch::before { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(255, 255, 255, 0.15); }
-        .pitch::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100px; height: 100px; border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 50%; }
-
-        .player-card { background: rgba(0, 0, 0, 0.5); border: 1px dashed rgba(255,255,255,0.4); border-radius: 6px; width: 75px; height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-size: 0.75rem; z-index: 10; cursor: pointer; transition: all 0.2s; }
-        .player-card.filled { background: linear-gradient(135deg, rgba(29, 78, 216, 0.6) 0%, rgba(30, 58, 138, 0.8) 100%); border: 1px solid #3b82f6; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); cursor: default; }
-        
-        @keyframes pulse-slot { 0% { box-shadow: 0 0 0 0 rgba(253, 224, 71, 0.7); border-color: #fde047;} 70% { box-shadow: 0 0 0 10px rgba(253, 224, 71, 0); border-color: rgba(255,255,255,0.4); } 100% { box-shadow: 0 0 0 0 rgba(253, 224, 71, 0); border-color: rgba(255,255,255,0.4); } }
-        .highlight-slots .player-card:not(.filled) { animation: pulse-slot 1.5s infinite; border-style: solid; }
-
-        .pos-pill { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; text-transform: uppercase; }
-        .pos-pill.active { background: #3b82f6; border-color: #60a5fa; color: white; box-shadow: 0 0 10px rgba(59,130,246,0.5); }
-        .my-turn-glow { border-color: #22c55e !important; box-shadow: 0 0 15px rgba(34, 197, 94, 0.3); }
-
-        @keyframes fadeInLetter { 0% { opacity: 0; color: transparent; text-shadow: 0 0 25px #fde047; transform: scale(1.4); } 50% { opacity: 1; color: transparent; text-shadow: 0 0 10px #fde047; transform: scale(1.1); } 100% { opacity: 1; color: #facc15; text-shadow: 0 0 2px rgba(250, 204, 21, 0.4); transform: scale(1); } }
-        .animate-scale-in { animation: scaleIn 0.6s forwards; }
-        @keyframes scaleIn { 0% { opacity: 0; transform: scale(0.2); } 80% { transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
-        .letter { display: inline-block; opacity: 0; }
-        .stat-badge { display: inline-flex; gap: 2px; background: rgba(0,0,0,0.4); padding: 2px 5px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); }
-        ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
-    </style>
-</head>
-<body class="p-4 md:p-8 flex items-center justify-center min-h-screen relative">
-
-    <!-- 1. PANTALLA DE CONFIGURACIÓN Y CSV -->
-    <div id="step1-screen" class="glass p-10 max-w-md w-full text-center relative z-10">
-        <h1 class="text-4xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">DRAFT ONLINE</h1>
-        <p class="text-gray-400 mb-6">Prepara tus datos para conectar</p>
-
-        <div class="mb-6 text-left bg-black/30 p-4 rounded-lg border border-white/10">
-            <label class="block text-sm text-gray-300 font-bold mb-2"><i class="fas fa-database text-blue-400"></i> Carga BASE_DRAFT_FINAL.csv</label>
-            <input type="file" id="csv-file" accept=".csv" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-600 file:text-white cursor-pointer" onchange="loadCSV(event)">
-            <div id="csv-status" class="text-xs text-yellow-400 mt-2 font-mono">Esperando archivo...</div>
-        </div>
-
-        <input type="text" id="input-nick" placeholder="Tu Nickname (Ej: Marcos)" class="w-full mb-4 p-3 bg-white/5 border border-white/10 rounded outline-none focus:border-blue-500 text-white">
-        <input type="text" id="input-team" placeholder="Nombre de tu Equipo (Ej: FC Pacos)" class="w-full mb-8 p-3 bg-white/5 border border-white/10 rounded outline-none focus:border-blue-500 text-white">
-        
-        <button id="btn-next" onclick="goToLobbyChoice()" disabled class="w-full glass-button text-white font-bold py-3 rounded-lg flex justify-center items-center gap-2">
-            Continuar <i class="fas fa-arrow-right"></i>
-        </button>
-    </div>
-
-    <!-- 2. PANTALLA DE SELECCIÓN DE SALA -->
-    <div id="step2-screen" class="hidden glass p-10 max-w-md w-full text-center relative z-10">
-        <h2 class="text-2xl font-bold mb-6">Lobby Multijugador</h2>
-        
-        <button onclick="createRoom()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mb-4 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
-            <i class="fas fa-plus-circle"></i> Crear Nueva Sala
-        </button>
-        
-        <div class="flex items-center gap-4 my-4">
-            <div class="h-px bg-white/20 flex-1"></div><span class="text-gray-400 text-sm">O</span><div class="h-px bg-white/20 flex-1"></div>
-        </div>
-
-        <input type="text" id="input-roomcode" placeholder="Código de la sala" class="w-full mb-4 p-3 bg-white/5 border border-white/10 rounded outline-none focus:border-blue-500 text-center text-xl font-mono uppercase text-white">
-        
-        <button onclick="joinRoom()" class="w-full glass-button text-white font-bold py-3 rounded-lg">
-            <i class="fas fa-sign-in-alt"></i> Unirse a la Sala
-        </button>
-    </div>
-
-    <!-- 3. LOBBY DE ESPERA -->
-    <div id="lobby-screen" class="hidden glass p-10 max-w-xl w-full text-center relative z-10">
-        <h2 class="text-3xl font-bold mb-2">Sala: <span id="lobby-code-display" class="text-blue-400 tracking-widest font-mono">ABCD</span></h2>
-        <p class="text-gray-400 mb-6">Esperando a que entren tus amigos...</p>
-
-        <button onclick="copyInviteLink()" class="mb-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded border border-white/20 text-sm transition">
-            <i class="fas fa-link text-blue-400"></i> Copiar enlace de invitación
-        </button>
-
-        <div class="bg-black/40 rounded-lg border border-white/10 p-4 mb-6 min-h-[200px]">
-            <h3 class="text-left font-bold text-sm text-gray-400 mb-3 uppercase">Jugadores Unidos (<span id="lobby-count">1</span>)</h3>
-            <ul id="lobby-players-list" class="flex flex-col gap-2 text-left">
-                <!-- Se rellena con Firebase -->
-            </ul>
-        </div>
-
-        <div id="host-controls" class="hidden flex flex-col gap-3">
-            <button onclick="addBot()" class="w-full glass-button text-white py-2 rounded-lg text-sm border-yellow-500/50 hover:bg-yellow-500/20">
-                <i class="fas fa-robot text-yellow-500"></i> Añadir Bot (Opcional)
-            </button>
-            <button onclick="startOnlineDraft()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.5)]">
-                <i class="fas fa-play"></i> ¡Sortear Turnos y Comenzar!
-            </button>
-        </div>
-        <div id="guest-controls" class="text-yellow-400 animate-pulse text-sm">
-            Esperando a que el creador de la sala comience...
-        </div>
-    </div>
-
-    <!-- 4. PANTALLA PRINCIPAL DEL DRAFT -->
-    <div id="draft-screen" class="hidden w-full max-w-7xl flex-col gap-4 relative z-10">
-        <div id="draft-header" class="glass p-4 flex flex-col md:flex-row justify-between items-center transition-all">
-            <div class="flex items-center gap-4 mb-4 md:mb-0">
-                <div class="text-sm text-gray-400">Ronda <span id="round-indicator" class="text-white font-bold text-lg">1</span></div>
-                <div class="h-8 w-px bg-white/20"></div>
-                <div>Turno de: <span id="current-turn-name" class="font-bold text-xl text-blue-400">...</span></div>
-            </div>
-            <div class="text-center">
-                <div class="text-xs text-gray-400 uppercase tracking-widest">Tiempo</div>
-                <div id="timer" class="text-4xl font-mono font-bold text-green-400">01:00</div>
-            </div>
-        </div>
-
-        <div id="jumbotron" class="glass w-full p-6 text-center hidden relative overflow-hidden transition-all duration-500">
-            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 animate-pulse"></div>
-            <div class="relative z-10 text-xl font-extrabold uppercase text-white">Pick <span id="jumbo-pick" class="text-blue-400">#1</span></div>
-            <div class="relative z-10 text-lg mt-1 text-gray-300"><span id="jumbo-team" class="font-bold text-blue-300">Equipo</span> selecciona a...</div>
-            <div class="relative z-10 flex flex-col md:flex-row justify-center items-center gap-4 mt-4 h-[60px]">
-                <div id="jumbo-rat-container" class="hidden"><span id="jumbo-rat" class="text-white text-3xl font-black bg-black/80 px-4 py-2 rounded-lg border-2 border-yellow-500">99</span></div>
-                <div id="jumbo-player" class="text-3xl md:text-5xl font-black"></div>
-            </div>
-            <div id="jumbo-pos" class="relative z-10 text-lg font-bold text-blue-300 mt-4 opacity-0 transition-opacity">en la posición de <span id="jumbo-pos-text" class="text-white underline">MC</span></div>
-        </div>
-
-        <div class="flex flex-col lg:flex-row gap-6 h-[700px]" id="play-area">
-            <div class="w-full lg:w-7/12 flex flex-col gap-4">
-                <div class="glass p-2 flex gap-2 overflow-x-auto" id="team-tabs"></div>
-                <div id="placement-banner" class="hidden bg-yellow-500 text-black font-bold p-2 text-center rounded animate-pulse">¡Selecciona el hueco para <span id="placement-name"></span>!</div>
-                <div class="glass pitch flex-1 p-4" id="pitch-container"></div>
-            </div>
-
-            <div class="w-full lg:w-5/12 glass flex flex-col overflow-hidden">
-                <div class="p-4 border-b border-white/10 bg-black/20">
-                    <h2 class="text-xl font-bold flex justify-between items-center mb-4">Agencia Libre</h2>
-                    <div class="flex gap-2 mb-4">
-                        <input type="text" id="search-input" placeholder="Buscar jugador..." class="flex-1 p-2 bg-white/5 border border-white/10 rounded text-sm text-white outline-none" oninput="renderPlayers()">
-                        <select id="sort-filter" class="p-2 bg-white/5 border border-white/10 rounded text-xs text-white outline-none" onchange="renderPlayers()">
-                            <option value="rat">OVR</option>
-                            <option value="pac">PAC</option>
-                            <option value="sho">SHO</option>
-                            <option value="pas">PAS</option>
-                            <option value="dri">DRI</option>
-                            <option value="def">DEF</option>
-                        </select>
-                    </div>
-                    <div class="flex flex-wrap gap-1.5" id="pos-filter-container">
-                        <div class="pos-pill" onclick="togglePosFilter('GK')">GK</div>
-                        <div class="pos-pill" onclick="togglePosFilter('CB')">CB</div>
-                        <div class="pos-pill" onclick="togglePosFilter('LB')">LB</div>
-                        <div class="pos-pill" onclick="togglePosFilter('RB')">RB</div>
-                        <div class="pos-pill" onclick="togglePosFilter('CDM')">CDM</div>
-                        <div class="pos-pill" onclick="togglePosFilter('CM')">CM</div>
-                        <div class="pos-pill" onclick="togglePosFilter('CAM')">CAM</div>
-                        <div class="pos-pill" onclick="togglePosFilter('LM')">LM</div>
-                        <div class="pos-pill" onclick="togglePosFilter('RM')">RM</div>
-                        <div class="pos-pill" onclick="togglePosFilter('ST')">ST</div>
-                        <div class="pos-pill" onclick="togglePosFilter('LW')">LW</div>
-                        <div class="pos-pill" onclick="togglePosFilter('RW')">RW</div>
-                        <div class="pos-pill !bg-red-500/20" onclick="clearPosFilters()">Reset</div>
-                    </div>
-                </div>
-                <div id="players-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2 relative"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- PANTALLA FINAL (Adaptada en Cuadrícula para múltiples personas) -->
-    <div id="end-screen" class="hidden w-full max-w-7xl flex-col gap-6 relative z-10">
-        <h1 class="text-4xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-2">RESULTADOS DEL DRAFT</h1>
-        <!-- Utilizamos un grid que se adapta a más columnas según la pantalla -->
-        <div id="final-pitches-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full"></div>
-    </div>
-
-<script>
-    let availablePlayers = []; 
-    let localTakenPlayers = {}; 
-    
-    let myUserId = "uid_" + Math.random().toString(36).substr(2, 9); 
-    let currentRoomId = null;
-    let roomRef = null;
-    let isHost = false;
-    
-    let serverState = {
-        status: 'lobby', host: null, users: {}, draftOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}, reveal: null
-    };
-
-    let viewingUserId = myUserId; 
-    let maxRounds = 11; 
-    let turnTime = 60;
-    let localTimerInterval = null;
-    let isRevealing = false; 
-    let pendingPlayer = null; 
-    let activePosFilters = []; 
-    let botCounter = 1;
-
-    const emptyTeam = () => ({ POR: null, LD: null, DFC1: null, DFC2: null, LI: null, MC1: null, MC2: null, MC3: null, ED: null, EI: null, DC: null });
-
-    const getPitchHTML = (prefix = "slot") => `
-        <div class="flex justify-around w-full z-10">
-            <div class="player-card" id="${prefix}-EI" onclick="selectPitchSlot('${prefix}', 'EI')"><span class="text-gray-400 text-xs font-bold">EI</span></div>
-            <div class="player-card" id="${prefix}-DC" onclick="selectPitchSlot('${prefix}', 'DC')"><span class="text-gray-400 text-xs font-bold">DC</span></div>
-            <div class="player-card" id="${prefix}-ED" onclick="selectPitchSlot('${prefix}', 'ED')"><span class="text-gray-400 text-xs font-bold">ED</span></div>
-        </div>
-        <div class="flex justify-around w-full z-10">
-            <div class="player-card" id="${prefix}-MC1" onclick="selectPitchSlot('${prefix}', 'MC1')"><span class="text-gray-400 text-xs font-bold">MC</span></div>
-            <div class="player-card" id="${prefix}-MC2" onclick="selectPitchSlot('${prefix}', 'MC2')"><span class="text-gray-400 text-xs font-bold">MC</span></div>
-            <div class="player-card" id="${prefix}-MC3" onclick="selectPitchSlot('${prefix}', 'MC3')"><span class="text-gray-400 text-xs font-bold">MC</span></div>
-        </div>
-        <div class="flex justify-around w-full z-10">
-            <div class="player-card" id="${prefix}-LI" onclick="selectPitchSlot('${prefix}', 'LI')"><span class="text-gray-400 text-xs font-bold">LI</span></div>
-            <div class="player-card" id="${prefix}-DFC1" onclick="selectPitchSlot('${prefix}', 'DFC1')"><span class="text-gray-400 text-xs font-bold">DFC</span></div>
-            <div class="player-card" id="${prefix}-DFC2" onclick="selectPitchSlot('${prefix}', 'DFC2')"><span class="text-gray-400 text-xs font-bold">DFC</span></div>
-            <div class="player-card" id="${prefix}-LD" onclick="selectPitchSlot('${prefix}', 'LD')"><span class="text-gray-400 text-xs font-bold">LD</span></div>
-        </div>
-        <div class="flex justify-around w-full z-10"><div class="player-card" id="${prefix}-POR" onclick="selectPitchSlot('${prefix}', 'POR')"><span class="text-gray-400 text-xs font-bold">POR</span></div></div>
-    `;
-
-    window.onload = () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        if(urlParams.has('room')) document.getElementById('input-roomcode').value = urlParams.get('room');
-    };
-
-    function loadCSV(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const statusEl = document.getElementById('csv-status');
-        statusEl.innerText = "Procesando...";
-        Papa.parse(file, {
-            header: true, skipEmptyLines: true,
-            complete: function(results) {
-                availablePlayers = results.data.map(row => ({
-                    id: row.ID, name: row.Name, rat: parseInt(row.OVR),
-                    pac: parseInt(row.PAC), sho: parseInt(row.SHO), pas: parseInt(row.PAS),
-                    dri: parseInt(row.DRI), def: parseInt(row.DEF), pos: row.POS || "N/A"
-                })).filter(p => p.name && !isNaN(p.rat));
-                
-                availablePlayers.sort((a,b) => b.rat - a.rat);
-                statusEl.innerText = `¡Éxito! ${availablePlayers.length} jugadores cargados.`;
-                document.getElementById('btn-next').disabled = false;
-            }
-        });
-    }
-
-    function goToLobbyChoice() {
-        const nick = document.getElementById('input-nick').value.trim();
-        const team = document.getElementById('input-team').value.trim();
-        if(!nick || !team) return alert("Rellena Nick y Nombre de Equipo");
-        document.getElementById('step1-screen').classList.add('hidden');
-        document.getElementById('step2-screen').classList.remove('hidden');
-    }
-
-    function createRoom() {
-        if(!db) return alert("Firebase no configurado. Asegúrate de poner tus credenciales en el HTML.");
-        isHost = true;
-        currentRoomId = Math.random().toString(36).substr(2, 4).toUpperCase(); 
-        
-        const nick = document.getElementById('input-nick').value.trim();
-        const team = document.getElementById('input-team').value.trim();
-
-        roomRef = db.ref('rooms/' + currentRoomId);
-        roomRef.set({
-            status: 'lobby', host: myUserId,
-            users: { [myUserId]: { id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false } },
-            draftOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}
-        }).then(() => {
-            enterLobbyUI(); listenToServer(); roomRef.onDisconnect().remove();
-        });
-    }
-
-    function joinRoom() {
-        if(!db) return alert("Firebase no configurado.");
-        currentRoomId = document.getElementById('input-roomcode').value.trim().toUpperCase();
-        if(!currentRoomId) return alert("Introduce un código.");
-        roomRef = db.ref('rooms/' + currentRoomId);
-        
-        roomRef.once('value').then(snap => {
-            const data = snap.val();
-            if(!data) return alert("La sala no existe.");
-            if(data.status !== 'lobby') return alert("El draft ya ha empezado.");
-
-            const nick = document.getElementById('input-nick').value.trim();
-            const team = document.getElementById('input-team').value.trim();
-
-            roomRef.child('users').child(myUserId).set({
-                id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false
-            }).then(() => {
-                enterLobbyUI(); listenToServer(); roomRef.child('users').child(myUserId).onDisconnect().remove();
-            });
-        });
-    }
-
-    function enterLobbyUI() {
-        document.getElementById('step2-screen').classList.add('hidden');
-        document.getElementById('lobby-screen').classList.remove('hidden');
-        document.getElementById('lobby-code-display').innerText = currentRoomId;
-        if(isHost) {
-            document.getElementById('host-controls').classList.remove('hidden');
-            document.getElementById('host-controls').classList.add('flex');
-            document.getElementById('guest-controls').classList.add('hidden');
-        }
-    }
-
-    function copyInviteLink() {
-        const url = window.location.origin + window.location.pathname + "?room=" + currentRoomId;
-        navigator.clipboard.writeText(url).then(() => alert("Link copiado: Pásalo a tus amigos!"));
-    }
-
-    function addBot() {
-        const botId = "bot_" + Math.random().toString(36).substr(2, 5);
-        roomRef.child('users').child(botId).set({
-            id: botId, nick: "Bot " + botCounter, teamName: "CPU " + botCounter, team: emptyTeam(), isBot: true
-        });
-        botCounter++;
-    }
-
-    function startOnlineDraft() {
-        // SORTEO DE USUARIOS PARA FAIR PLAY
-        let userIds = Object.keys(serverState.users);
-        userIds = userIds.sort(() => Math.random() - 0.5); // Sorteo aleatorio de posiciones
-
-        let order = [];
-        for (let round = 1; round <= maxRounds; round++) {
-            let roundOrder = [...userIds];
-            if (round % 2 === 0) roundOrder.reverse();
-            order.push(...roundOrder);
-        }
-
-        roomRef.update({ status: 'drafting', draftOrder: order, currentPickIndex: 0, turnEndTime: Date.now() + (turnTime * 1000) });
-    }
-
-    function listenToServer() {
-        roomRef.on('value', snap => {
-            const data = snap.val();
-            if(!data) return; 
-
-            const prevStatus = serverState.status;
-            serverState = data;
-            localTakenPlayers = data.takenPlayers || {};
-
-            if(data.status === 'lobby') {
-                updateLobbyList();
-            } 
-            else if(data.status === 'drafting') {
-                if(prevStatus === 'lobby') {
-                    document.getElementById('lobby-screen').classList.add('hidden');
-                    document.getElementById('draft-screen').classList.remove('hidden');
-                    document.getElementById('draft-screen').classList.add('flex');
-                    document.getElementById('pitch-container').innerHTML = getPitchHTML("slot");
-                    startLocalTimerLoop();
-                }
-
-                if(data.reveal && data.reveal.ts !== (window.lastRevealTs || 0)) {
-                    window.lastRevealTs = data.reveal.ts;
-                    triggerDramaticReveal(data.reveal);
-                } else if (!isRevealing) {
-                    updateDraftUI();
-                }
-            }
-            else if(data.status === 'finished') {
-                showEndScreen();
-            }
-        });
-    }
-
-    function updateLobbyList() {
-        const list = document.getElementById('lobby-players-list');
-        list.innerHTML = '';
-        let count = 0;
-        for(let uid in serverState.users) {
-            const u = serverState.users[uid];
-            list.innerHTML += `<li class="bg-white/5 p-2 rounded border border-white/10"><i class="fas ${u.isBot?'fa-robot text-yellow-400':'fa-user text-blue-400'} mr-2"></i><b>${u.nick}</b> <span class="text-gray-400 text-xs">(${u.teamName})</span></li>`;
-            count++;
-        }
-        document.getElementById('lobby-count').innerText = count;
-    }
-
-    function updateDraftUI() {
-        document.getElementById('round-indicator').innerText = Math.floor(serverState.currentPickIndex / Object.keys(serverState.users).length) + 1;
-        
-        const activeUid = serverState.draftOrder[serverState.currentPickIndex];
-        const activeUser = serverState.users[activeUid];
-        if(!activeUser) return showEndScreen();
-        
-        document.getElementById('current-turn-name').innerText = (activeUid === myUserId) ? "¡TU TURNO!" : activeUser.nick;
-        
-        const header = document.getElementById('draft-header');
-        if(activeUid === myUserId) {
-            header.classList.add('my-turn-glow');
-            document.getElementById('timer').classList.replace('text-green-400', 'text-yellow-400');
-        } else {
-            header.classList.remove('my-turn-glow');
-            document.getElementById('timer').classList.replace('text-yellow-400', 'text-green-400');
-        }
-
-        renderTabs();
-        
-        const userToView = serverState.users[viewingUserId] || serverState.users[myUserId];
-        fillPitchData(userToView.team, "slot");
-        
-        renderPlayers();
-
-        // Control de BOTS gestionado por el Host
-        if(isHost && activeUser.isBot) {
-            if(window.botWorkingForIndex !== serverState.currentPickIndex) {
-                window.botWorkingForIndex = serverState.currentPickIndex;
-                let botThinkingTime = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
-                
-                setTimeout(() => {
-                    if (serverState.draftOrder[serverState.currentPickIndex] !== activeUid) return; 
-                    const s = ['DC','EI','ED','MC2','MC1','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !activeUser.team[x]);
-                    let available = availablePlayers.filter(p => !localTakenPlayers[p.id]);
-                    if(s && available.length > 0) {
-                        let sortedForBot = available.sort((a,b) => b.rat - a.rat);
-                        pushDraftPickToFirebase(sortedForBot[0], s, activeUid);
-                    }
-                }, botThinkingTime);
-            }
-        }
-    }
-
-    function renderTabs() {
-        const div = document.getElementById('team-tabs'); 
-        div.innerHTML = '';
-        for(let uid in serverState.users) {
-            const u = serverState.users[uid];
-            const b = document.createElement('button');
-            b.className = `px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${u.id === viewingUserId ? 'bg-blue-600 text-white' : 'bg-white/10 text-gray-400 hover:bg-white/20'}`;
-            b.innerText = u.teamName; 
-            b.onclick = () => { 
-                viewingUserId = u.id; 
-                fillPitchData(serverState.users[viewingUserId].team, "slot");
-                renderTabs(); 
-            };
-            div.appendChild(b);
-        }
-    }
-
-    function fillPitchData(team, prefix) {
-        if(!team) return;
-        const slots = ['POR', 'LD', 'DFC1', 'DFC2', 'LI', 'MC1', 'MC2', 'MC3', 'ED', 'EI', 'DC'];
-        slots.forEach(slot => {
-            const el = document.getElementById(`${prefix}-${slot}`);
-            if(!el) return;
-            el.className = 'player-card'; 
-            if (team[slot]) {
-                el.classList.add('filled');
-                el.innerHTML = `<span class="font-bold text-yellow-300 text-xs mb-1">${team[slot].rat}</span><span class="font-bold truncate w-full px-1">${team[slot].name}</span>`;
-            } else {
-                let defaultText = slot.replace(/[0-9]/g, ''); 
-                el.innerHTML = `<span class="text-gray-400 text-xs font-bold">${defaultText}</span>`;
-            }
-        });
-    }
-
-    function togglePosFilter(pos) { const idx = activePosFilters.indexOf(pos); if(idx > -1) activePosFilters.splice(idx, 1); else activePosFilters.push(pos); document.querySelectorAll('.pos-pill').forEach(pill => { if(activePosFilters.includes(pill.innerText)) pill.classList.add('active'); else pill.classList.remove('active'); }); renderPlayers(); }
-    function clearPosFilters() { activePosFilters = []; document.querySelectorAll('.pos-pill').forEach(pill => pill.classList.remove('active')); renderPlayers(); }
-
-    function renderPlayers() {
-        const listDiv = document.getElementById('players-list');
-        const searchTerm = document.getElementById('search-input').value.toLowerCase();
-        const sortBy = document.getElementById('sort-filter').value;
-        const isMyTurn = serverState.draftOrder[serverState.currentPickIndex] === myUserId && !isRevealing;
-
-        let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
-
-        let filtered = unpickedPlayers.filter(p => {
-            const matchesSearch = p.name.toLowerCase().includes(searchTerm);
-            const matchesPos = activePosFilters.length === 0 || activePosFilters.some(f => p.pos.includes(f));
-            return matchesSearch && matchesPos;
-        });
-
-        filtered.sort((a, b) => b[sortBy] - a[sortBy]);
-        listDiv.innerHTML = '';
-        
-        filtered.slice(0, 50).forEach(player => {
-            const isPending = pendingPlayer && pendingPlayer.id === player.id;
-            const div = document.createElement('div');
-            div.className = `flex justify-between items-center p-3 rounded-lg border transition ${isPending ? 'bg-yellow-500/20 border-yellow-500' : 'bg-white/5 border-white/10'}`;
-            div.innerHTML = `
-                <div class="flex items-center gap-3 flex-1 overflow-hidden">
-                    <div class="flex flex-col items-center flex-shrink-0">
-                        <div class="bg-black/40 text-yellow-400 font-bold rounded p-1.5 text-base w-11 text-center border border-white/10">${player.rat}</div>
-                        <div class="text-[9px] font-black text-blue-400 mt-1 uppercase">${player.pos.split(',')[0]}</div>
-                    </div>
-                    <div class="flex flex-col flex-1 min-w-0">
-                        <div class="font-bold text-base truncate text-white">${player.name}</div>
-                        <div class="flex gap-1 mt-1 text-[9px] text-gray-400 flex-wrap">
-                            <span class="stat-badge ${sortBy==='pac'?'border-yellow-500 text-yellow-200':''}">PAC <b>${player.pac}</b></span>
-                            <span class="stat-badge ${sortBy==='sho'?'border-yellow-500 text-yellow-200':''}">SHO <b>${player.sho}</b></span>
-                            <span class="stat-badge ${sortBy==='pas'?'border-yellow-500 text-yellow-200':''}">PAS <b>${player.pas}</b></span>
-                            <span class="stat-badge ${sortBy==='dri'?'border-yellow-500 text-yellow-200':''}">DRI <b>${player.dri}</b></span>
-                            <span class="stat-badge ${sortBy==='def'?'border-yellow-500 text-yellow-200':''}">DEF <b>${player.def}</b></span>
-                        </div>
-                    </div>
-                </div>
-                <button onclick="startPlacementDraft('${player.id}')" ${!isMyTurn ? 'disabled' : ''} class="${isPending ? 'bg-yellow-600' : 'glass-button'} text-white px-3 py-2 rounded font-bold text-xs flex-shrink-0">${isPending ? 'OK' : 'Fichar'}</button>
-            `;
-            listDiv.appendChild(div);
-        });
-    }
-
-    function startPlacementDraft(playerId) {
-        if(isRevealing) return;
-        pendingPlayer = (pendingPlayer && pendingPlayer.id === playerId) ? null : availablePlayers.find(p => p.id === playerId);
-        if(pendingPlayer) {
-            document.getElementById('pitch-container').classList.add('highlight-slots');
-            document.getElementById('placement-name').innerText = pendingPlayer.name;
-            document.getElementById('placement-banner').classList.remove('hidden');
-            if(viewingUserId !== myUserId) { viewingUserId = myUserId; fillPitchData(serverState.users[myUserId].team, "slot"); renderTabs(); }
-        } else {
-            document.getElementById('pitch-container').classList.remove('highlight-slots');
-            document.getElementById('placement-banner').classList.add('hidden');
-        }
-        renderPlayers();
-    }
-
-    function selectPitchSlot(prefix, slotId) {
-        if(prefix !== "slot" || !pendingPlayer || serverState.draftOrder[serverState.currentPickIndex] !== myUserId || viewingUserId !== myUserId) return;
-        const user = serverState.users[myUserId];
-        if(user.team[slotId]) return alert("Ese hueco ya está ocupado.");
-        
-        pushDraftPickToFirebase(pendingPlayer, slotId, myUserId);
-    }
-
-    function pushDraftPickToFirebase(player, slotId, userId) {
-        let updates = {};
-        updates[`users/${userId}/team/${slotId}`] = player;
-        updates[`takenPlayers/${player.id}`] = true;
-        updates[`reveal`] = { player: player, slotId: slotId, userId: userId, pickNum: serverState.currentPickIndex + 1, ts: Date.now() };
-
-        pendingPlayer = null; 
-        document.getElementById('pitch-container').classList.remove('highlight-slots');
-        document.getElementById('placement-banner').classList.add('hidden');
-
-        roomRef.update(updates);
-    }
-
-    function triggerDramaticReveal(revealData) {
-        isRevealing = true;
-        const { player, slotId, userId, pickNum } = revealData;
-        const user = serverState.users[userId];
-
-        const jumbo = document.getElementById('jumbotron');
-        const ratBox = document.getElementById('jumbo-rat-container');
-        const nameBox = document.getElementById('jumbo-player');
-        const posBox = document.getElementById('jumbo-pos');
-        
-        jumbo.classList.remove('hidden'); 
-        ratBox.classList.add('hidden'); 
-        ratBox.classList.remove('animate-scale-in');
-        posBox.classList.add('opacity-0'); 
-        nameBox.innerHTML = '';
-        
-        document.getElementById('jumbo-pick').innerText = '#' + pickNum;
-        document.getElementById('jumbo-team').innerText = user.teamName;
-        document.getElementById('jumbo-rat').innerText = player.rat;
-        document.getElementById('jumbo-pos-text').innerText = slotId.replace(/[0-9]/g, '');
-
-        setTimeout(() => {
-            ratBox.classList.remove('hidden'); ratBox.classList.add('animate-scale-in');
-            setTimeout(() => {
-                let delay = 0;
-                player.name.split('').forEach(char => {
-                    const span = document.createElement('span');
-                    span.innerHTML = char === ' ' ? '&nbsp;' : char;
-                    span.className = 'letter';
-                    span.style.animation = `fadeInLetter 0.8s ease-out forwards ${delay}ms`;
-                    nameBox.appendChild(span); delay += 100;
-                });
-                setTimeout(() => posBox.classList.remove('opacity-0'), delay + 200);
-                
-                setTimeout(() => {
-                    isRevealing = false; 
-                    jumbo.classList.add('hidden');
-                    
-                    if(isHost) {
-                        const nextPick = serverState.currentPickIndex + 1;
-                        if(nextPick >= serverState.draftOrder.length) roomRef.update({ status: 'finished' });
-                        else roomRef.update({ currentPickIndex: nextPick, turnEndTime: Date.now() + (turnTime * 1000) });
-                    }
-                }, delay + 2500); 
-            }, 800);
-        }, 500);
-    }
-
-    function startLocalTimerLoop() {
-        if(localTimerInterval) clearInterval(localTimerInterval);
-        
-        localTimerInterval = setInterval(() => {
-            if(isRevealing || serverState.status !== 'drafting') return;
-            
-            let msLeft = serverState.turnEndTime - Date.now();
-            let secLeft = Math.max(0, Math.floor(msLeft / 1000));
-            
-            const timerEl = document.getElementById('timer');
-            timerEl.innerText = `00:${secLeft < 10 ? '0'+secLeft : secLeft}`;
-            if(secLeft <= 10) {
-                timerEl.classList.add('text-red-500');
-                timerEl.classList.remove('text-green-400', 'text-yellow-400');
-            } else {
-                timerEl.classList.remove('text-red-500');
-            }
-
-            if(secLeft === 0 && isHost) {
-                if(window.punishmentTriggered !== serverState.currentPickIndex) {
-                    window.punishmentTriggered = serverState.currentPickIndex;
-                    const uId = serverState.draftOrder[serverState.currentPickIndex];
-                    const u = serverState.users[uId];
-                    const s = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !u.team[x]);
-                    let available = availablePlayers.filter(p => !localTakenPlayers[p.id]).sort((a,b) => b.rat - a.rat);
-                    if(s && available.length > 0) pushDraftPickToFirebase(available[0], s, uId);
-                }
-            }
-        }, 200);
-    }
-
+    // ==========================================
+    // PANTALLA FINAL ONLINE
+    // ==========================================
     function showEndScreen() {
         if(localTimerInterval) clearInterval(localTimerInterval);
         document.getElementById('draft-screen').classList.add('hidden');
