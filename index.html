@@ -8,11 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     
-    <!-- LIBRERÍAS DE FIREBASE (Versión 8 para que sea fácil de copiar y pegar) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-    <!-- LIBRERÍAS DE FIREBASE (Versión 8) -->
+    <!-- LIBRERÍAS DE FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -107,7 +103,7 @@
     <!-- 3. LOBBY DE ESPERA -->
     <div id="lobby-screen" class="hidden glass p-10 max-w-xl w-full text-center relative z-10">
         <h2 class="text-3xl font-bold mb-2">Sala: <span id="lobby-code-display" class="text-blue-400 tracking-widest font-mono">ABCD</span></h2>
-        <p class="text-gray-400 mb-6">Esperando jugadores...</p>
+        <p class="text-gray-400 mb-6">Esperando a que entren tus amigos...</p>
 
         <button onclick="copyInviteLink()" class="mb-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded border border-white/20 text-sm transition">
             <i class="fas fa-link text-blue-400"></i> Copiar enlace de invitación
@@ -120,13 +116,12 @@
             </ul>
         </div>
 
-        <!-- Solo visible para el Host -->
         <div id="host-controls" class="hidden flex flex-col gap-3">
             <button onclick="addBot()" class="w-full glass-button text-white py-2 rounded-lg text-sm border-yellow-500/50 hover:bg-yellow-500/20">
-                <i class="fas fa-robot text-yellow-500"></i> Añadir Bot a la sala
+                <i class="fas fa-robot text-yellow-500"></i> Añadir Bot (Opcional)
             </button>
             <button onclick="startOnlineDraft()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.5)]">
-                <i class="fas fa-play"></i> ¡Comenzar Draft!
+                <i class="fas fa-play"></i> ¡Sortear Turnos y Comenzar!
             </button>
         </div>
         <div id="guest-controls" class="text-yellow-400 animate-pulse text-sm">
@@ -136,7 +131,6 @@
 
     <!-- 4. PANTALLA PRINCIPAL DEL DRAFT -->
     <div id="draft-screen" class="hidden w-full max-w-7xl flex-col gap-4 relative z-10">
-        <!-- HEADER -->
         <div id="draft-header" class="glass p-4 flex flex-col md:flex-row justify-between items-center transition-all">
             <div class="flex items-center gap-4 mb-4 md:mb-0">
                 <div class="text-sm text-gray-400">Ronda <span id="round-indicator" class="text-white font-bold text-lg">1</span></div>
@@ -149,7 +143,6 @@
             </div>
         </div>
 
-        <!-- JUMBOTRON -->
         <div id="jumbotron" class="glass w-full p-6 text-center hidden relative overflow-hidden transition-all duration-500">
             <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 animate-pulse"></div>
             <div class="relative z-10 text-xl font-extrabold uppercase text-white">Pick <span id="jumbo-pick" class="text-blue-400">#1</span></div>
@@ -161,7 +154,6 @@
             <div id="jumbo-pos" class="relative z-10 text-lg font-bold text-blue-300 mt-4 opacity-0 transition-opacity">en la posición de <span id="jumbo-pos-text" class="text-white underline">MC</span></div>
         </div>
 
-        <!-- AREA DE JUEGO -->
         <div class="flex flex-col lg:flex-row gap-6 h-[700px]" id="play-area">
             <div class="w-full lg:w-7/12 flex flex-col gap-4">
                 <div class="glass p-2 flex gap-2 overflow-x-auto" id="team-tabs"></div>
@@ -205,30 +197,25 @@
     </div>
 
     <!-- PANTALLA FINAL -->
-    <div id="end-screen" class="hidden w-full max-w-7xl flex-col gap-6 relative z-10"><div id="final-pitches-container" class="flex flex-col xl:flex-row justify-center flex-wrap gap-6 w-full"></div></div>
+    <div id="end-screen" class="hidden w-full max-w-7xl flex-col gap-6 relative z-10">
+        <h1 class="text-4xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-2">RESULTADOS DEL DRAFT</h1>
+        <div id="final-pitches-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full"></div>
+    </div>
 
 <script>
     // ==========================================
     // VARIABLES ONLINE Y ESTADO
     // ==========================================
-    let availablePlayers = []; // Todos los del CSV
-    let localTakenPlayers = {}; // Para filtrarlos rápido de la lista
+    let availablePlayers = []; 
+    let localTakenPlayers = {}; 
     
-    let myUserId = "uid_" + Math.random().toString(36).substr(2, 9); // Mi ID único
+    let myUserId = "uid_" + Math.random().toString(36).substr(2, 9); 
     let currentRoomId = null;
     let roomRef = null;
     let isHost = false;
     
-    // Estado sincronizado desde Firebase
     let serverState = {
-        status: 'lobby',
-        host: null,
-        users: {},
-        draftOrder: [],
-        currentPickIndex: 0,
-        turnEndTime: 0,
-        takenPlayers: {},
-        reveal: null
+        status: 'lobby', host: null, users: {}, draftOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}, reveal: null
     };
 
     let viewingUserId = myUserId; 
@@ -240,7 +227,8 @@
     let activePosFilters = []; 
     let botCounter = 1;
 
-    const emptyTeam = () => ({ POR: null, LD: null, DFC1: null, DFC2: null, LI: null, MC1: null, MC2: null, MC3: null, ED: null, EI: null, DC: null });
+    // FIX 1: Cambiado de 'null' a strings vacíos "" para que Firebase no los borre nunca
+    const emptyTeam = () => ({ POR: "", LD: "", DFC1: "", DFC2: "", LI: "", MC1: "", MC2: "", MC3: "", ED: "", EI: "", DC: "" });
 
     const getPitchHTML = (prefix = "slot") => `
         <div class="flex justify-around w-full z-10">
@@ -262,15 +250,9 @@
         <div class="flex justify-around w-full z-10"><div class="player-card" id="${prefix}-POR" onclick="selectPitchSlot('${prefix}', 'POR')"><span class="text-gray-400 text-xs font-bold">POR</span></div></div>
     `;
 
-    // ==========================================
-    // 1. CARGA DE CSV Y AUTO-JOIN
-    // ==========================================
     window.onload = () => {
-        // Comprobar si me han pasado un link con código de sala (ej: ?room=1234)
         const urlParams = new URLSearchParams(window.location.search);
-        if(urlParams.has('room')) {
-            document.getElementById('input-roomcode').value = urlParams.get('room');
-        }
+        if(urlParams.has('room')) document.getElementById('input-roomcode').value = urlParams.get('room');
     };
 
     function loadCSV(event) {
@@ -298,40 +280,25 @@
         const nick = document.getElementById('input-nick').value.trim();
         const team = document.getElementById('input-team').value.trim();
         if(!nick || !team) return alert("Rellena Nick y Nombre de Equipo");
-        
         document.getElementById('step1-screen').classList.add('hidden');
         document.getElementById('step2-screen').classList.remove('hidden');
     }
 
-    // ==========================================
-    // 2. LÓGICA DE SALA ONLINE (FIREBASE)
-    // ==========================================
     function createRoom() {
-        if(!db) return alert("Firebase no configurado. Pon tus credenciales en el código HTML.");
+        if(!db) return alert("Firebase no configurado. Asegúrate de poner tus credenciales en el HTML.");
         isHost = true;
-        currentRoomId = Math.random().toString(36).substr(2, 4).toUpperCase(); // Genera ej: "A4X9"
+        currentRoomId = Math.random().toString(36).substr(2, 4).toUpperCase(); 
         
         const nick = document.getElementById('input-nick').value.trim();
         const team = document.getElementById('input-team').value.trim();
 
         roomRef = db.ref('rooms/' + currentRoomId);
-        
-        // Estructura inicial en Firebase
         roomRef.set({
-            status: 'lobby',
-            host: myUserId,
-            users: {
-                [myUserId]: { id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false }
-            },
-            draftOrder: [],
-            currentPickIndex: 0,
-            turnEndTime: 0,
-            takenPlayers: {}
+            status: 'lobby', host: myUserId,
+            users: { [myUserId]: { id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false } },
+            draftOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}
         }).then(() => {
-            enterLobbyUI();
-            listenToServer();
-            // Borrar la sala cuando el Host cierre la pestaña
-            roomRef.onDisconnect().remove();
+            enterLobbyUI(); listenToServer(); roomRef.onDisconnect().remove();
         });
     }
 
@@ -339,10 +306,8 @@
         if(!db) return alert("Firebase no configurado.");
         currentRoomId = document.getElementById('input-roomcode').value.trim().toUpperCase();
         if(!currentRoomId) return alert("Introduce un código.");
-
         roomRef = db.ref('rooms/' + currentRoomId);
         
-        // Verificar si existe y está en lobby
         roomRef.once('value').then(snap => {
             const data = snap.val();
             if(!data) return alert("La sala no existe.");
@@ -351,14 +316,10 @@
             const nick = document.getElementById('input-nick').value.trim();
             const team = document.getElementById('input-team').value.trim();
 
-            // Me añado a Firebase
             roomRef.child('users').child(myUserId).set({
                 id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false
             }).then(() => {
-                enterLobbyUI();
-                listenToServer();
-                // Si me desconecto, me borro
-                roomRef.child('users').child(myUserId).onDisconnect().remove();
+                enterLobbyUI(); listenToServer(); roomRef.child('users').child(myUserId).onDisconnect().remove();
             });
         });
     }
@@ -367,7 +328,6 @@
         document.getElementById('step2-screen').classList.add('hidden');
         document.getElementById('lobby-screen').classList.remove('hidden');
         document.getElementById('lobby-code-display').innerText = currentRoomId;
-        
         if(isHost) {
             document.getElementById('host-controls').classList.remove('hidden');
             document.getElementById('host-controls').classList.add('flex');
@@ -382,20 +342,16 @@
 
     function addBot() {
         const botId = "bot_" + Math.random().toString(36).substr(2, 5);
-        const botNames = ["Real Bot", "Bot City FC", "Inter de Bot", "Bayern Bot"];
         roomRef.child('users').child(botId).set({
-            id: botId,
-            nick: "Bot " + botCounter,
-            teamName: botNames[botCounter % 4],
-            team: emptyTeam(),
-            isBot: true
+            id: botId, nick: "Bot " + botCounter, teamName: "CPU " + botCounter, team: emptyTeam(), isBot: true
         });
         botCounter++;
     }
 
     function startOnlineDraft() {
-        // Generar orden Snake
         let userIds = Object.keys(serverState.users);
+        userIds = userIds.sort(() => Math.random() - 0.5);
+
         let order = [];
         for (let round = 1; round <= maxRounds; round++) {
             let roundOrder = [...userIds];
@@ -403,26 +359,16 @@
             order.push(...roundOrder);
         }
 
-        roomRef.update({
-            status: 'drafting',
-            draftOrder: order,
-            currentPickIndex: 0,
-            turnEndTime: Date.now() + (turnTime * 1000)
-        });
+        roomRef.update({ status: 'drafting', draftOrder: order, currentPickIndex: 0, turnEndTime: Date.now() + (turnTime * 1000) });
     }
 
-    // ==========================================
-    // 3. SINCRONIZACIÓN EN TIEMPO REAL
-    // ==========================================
     function listenToServer() {
         roomRef.on('value', snap => {
             const data = snap.val();
-            if(!data) return; // Sala borrada
+            if(!data) return; 
 
             const prevStatus = serverState.status;
             serverState = data;
-            
-            // Actualizar lista de tomados para el filtro local
             localTakenPlayers = data.takenPlayers || {};
 
             if(data.status === 'lobby') {
@@ -430,17 +376,13 @@
             } 
             else if(data.status === 'drafting') {
                 if(prevStatus === 'lobby') {
-                    // Transición de Lobby a Draft
                     document.getElementById('lobby-screen').classList.add('hidden');
                     document.getElementById('draft-screen').classList.remove('hidden');
                     document.getElementById('draft-screen').classList.add('flex');
                     document.getElementById('pitch-container').innerHTML = getPitchHTML("slot");
-                    
-                    // Iniciar mi bucle de reloj local
                     startLocalTimerLoop();
                 }
 
-                // Si hay un evento de revelación nuevo (Animación)
                 if(data.reveal && data.reveal.ts !== (window.lastRevealTs || 0)) {
                     window.lastRevealTs = data.reveal.ts;
                     triggerDramaticReveal(data.reveal);
@@ -471,8 +413,7 @@
         
         const activeUid = serverState.draftOrder[serverState.currentPickIndex];
         const activeUser = serverState.users[activeUid];
-        
-        if(!activeUser) return showEndScreen(); // Safety
+        if(!activeUser) return showEndScreen();
         
         document.getElementById('current-turn-name').innerText = (activeUid === myUserId) ? "¡TU TURNO!" : activeUser.nick;
         
@@ -487,24 +428,21 @@
 
         renderTabs();
         
-        // Pinta el campo del usuario que estoy mirando
         const userToView = serverState.users[viewingUserId] || serverState.users[myUserId];
         fillPitchData(userToView.team, "slot");
         
         renderPlayers();
 
-        // Control de BOTS (Solo el host los mueve para no duplicar acciones)
         if(isHost && activeUser.isBot) {
-            // Previene que se disparen varios setTimeout si firebase hace syncs rápidos
             if(window.botWorkingForIndex !== serverState.currentPickIndex) {
                 window.botWorkingForIndex = serverState.currentPickIndex;
                 let botThinkingTime = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
                 
                 setTimeout(() => {
-                    // Doble check
                     if (serverState.draftOrder[serverState.currentPickIndex] !== activeUid) return; 
-                    
-                    const s = ['DC','EI','ED','MC2','MC1','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !activeUser.team[x]);
+                    // FIX 2: Salvavidas para el equipo (team = team || {})
+                    const team = activeUser.team || {};
+                    const s = ['DC','EI','ED','MC2','MC1','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !team[x] || !team[x].id);
                     let available = availablePlayers.filter(p => !localTakenPlayers[p.id]);
                     if(s && available.length > 0) {
                         let sortedForBot = available.sort((a,b) => b.rat - a.rat);
@@ -532,14 +470,15 @@
         }
     }
 
+    // FIX 3: Salvavidas en la función que dibujaba el campo
     function fillPitchData(team, prefix) {
-        if(!team) return;
+        team = team || {}; // Si viene nulo de Firebase, le ponemos un objeto vacío
         const slots = ['POR', 'LD', 'DFC1', 'DFC2', 'LI', 'MC1', 'MC2', 'MC3', 'ED', 'EI', 'DC'];
         slots.forEach(slot => {
             const el = document.getElementById(`${prefix}-${slot}`);
             if(!el) return;
             el.className = 'player-card'; 
-            if (team[slot]) {
+            if (team[slot] && team[slot].id) { // Solo lo llena si es un jugador de verdad
                 el.classList.add('filled');
                 el.innerHTML = `<span class="font-bold text-yellow-300 text-xs mb-1">${team[slot].rat}</span><span class="font-bold truncate w-full px-1">${team[slot].name}</span>`;
             } else {
@@ -549,16 +488,15 @@
         });
     }
 
-    // ==========================================
-    // 4. LÓGICA DE FICHAR ONLINE
-    // ==========================================
+    function togglePosFilter(pos) { const idx = activePosFilters.indexOf(pos); if(idx > -1) activePosFilters.splice(idx, 1); else activePosFilters.push(pos); document.querySelectorAll('.pos-pill').forEach(pill => { if(activePosFilters.includes(pill.innerText)) pill.classList.add('active'); else pill.classList.remove('active'); }); renderPlayers(); }
+    function clearPosFilters() { activePosFilters = []; document.querySelectorAll('.pos-pill').forEach(pill => pill.classList.remove('active')); renderPlayers(); }
+
     function renderPlayers() {
         const listDiv = document.getElementById('players-list');
         const searchTerm = document.getElementById('search-input').value.toLowerCase();
         const sortBy = document.getElementById('sort-filter').value;
         const isMyTurn = serverState.draftOrder[serverState.currentPickIndex] === myUserId && !isRevealing;
 
-        // Quitar los ya seleccionados globalmente
         let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
 
         let filtered = unpickedPlayers.filter(p => {
@@ -597,9 +535,6 @@
         });
     }
 
-    function togglePosFilter(pos) { const idx = activePosFilters.indexOf(pos); if(idx > -1) activePosFilters.splice(idx, 1); else activePosFilters.push(pos); document.querySelectorAll('.pos-pill').forEach(pill => { if(activePosFilters.includes(pill.innerText)) pill.classList.add('active'); else pill.classList.remove('active'); }); renderPlayers(); }
-    function clearPosFilters() { activePosFilters = []; document.querySelectorAll('.pos-pill').forEach(pill => pill.classList.remove('active')); renderPlayers(); }
-
     function startPlacementDraft(playerId) {
         if(isRevealing) return;
         pendingPlayer = (pendingPlayer && pendingPlayer.id === playerId) ? null : availablePlayers.find(p => p.id === playerId);
@@ -615,36 +550,27 @@
         renderPlayers();
     }
 
+    // FIX 4: Salvavidas al comprobar si el hueco está ocupado
     function selectPitchSlot(prefix, slotId) {
         if(prefix !== "slot" || !pendingPlayer || serverState.draftOrder[serverState.currentPickIndex] !== myUserId || viewingUserId !== myUserId) return;
         const user = serverState.users[myUserId];
-        if(user.team[slotId]) return alert("Ese hueco ya está ocupado.");
+        const team = user.team || {}; 
+        
+        if(team[slotId] && team[slotId].id) return alert("Ese hueco ya está ocupado.");
         
         pushDraftPickToFirebase(pendingPlayer, slotId, myUserId);
     }
 
-    // EL NÚCLEO ONLINE: Escribir a Firebase
     function pushDraftPickToFirebase(player, slotId, userId) {
         let updates = {};
-        // 1. Asignar a usuario
         updates[`users/${userId}/team/${slotId}`] = player;
-        // 2. Marcar como cogido
         updates[`takenPlayers/${player.id}`] = true;
-        // 3. Crear el evento de revelación para que todos lo vean
-        updates[`reveal`] = {
-            player: player,
-            slotId: slotId,
-            userId: userId,
-            pickNum: serverState.currentPickIndex + 1,
-            ts: Date.now()
-        };
+        updates[`reveal`] = { player: player, slotId: slotId, userId: userId, pickNum: serverState.currentPickIndex + 1, ts: Date.now() };
 
-        // Reseteo de UI local al instante
         pendingPlayer = null; 
         document.getElementById('pitch-container').classList.remove('highlight-slots');
         document.getElementById('placement-banner').classList.add('hidden');
 
-        // Enviar a la nube
         roomRef.update(updates);
     }
 
@@ -686,33 +612,23 @@
                     isRevealing = false; 
                     jumbo.classList.add('hidden');
                     
-                    // SOLO EL HOST AVANZA EL TURNO GLOBAL PARA EVITAR BUGS
                     if(isHost) {
                         const nextPick = serverState.currentPickIndex + 1;
-                        if(nextPick >= serverState.draftOrder.length) {
-                            roomRef.update({ status: 'finished' });
-                        } else {
-                            roomRef.update({
-                                currentPickIndex: nextPick,
-                                turnEndTime: Date.now() + (turnTime * 1000)
-                            });
-                        }
+                        if(nextPick >= serverState.draftOrder.length) roomRef.update({ status: 'finished' });
+                        else roomRef.update({ currentPickIndex: nextPick, turnEndTime: Date.now() + (turnTime * 1000) });
                     }
-                }, delay + 2500); // Dar tiempo a leer
+                }, delay + 2500); 
             }, 800);
         }, 500);
     }
 
-    // ==========================================
-    // RELOJ LOCAL (Sincronizado con Host)
-    // ==========================================
+    // FIX 5: Salvavidas para el auto-pick del temporizador si se acaba el tiempo
     function startLocalTimerLoop() {
         if(localTimerInterval) clearInterval(localTimerInterval);
         
         localTimerInterval = setInterval(() => {
             if(isRevealing || serverState.status !== 'drafting') return;
             
-            // Calculamos el tiempo restante restando la hora final a la hora actual de tu PC
             let msLeft = serverState.turnEndTime - Date.now();
             let secLeft = Math.max(0, Math.floor(msLeft / 1000));
             
@@ -725,23 +641,21 @@
                 timerEl.classList.remove('text-red-500');
             }
 
-            // Si se acaba el tiempo, el Host auto-asigna a quien sea
             if(secLeft === 0 && isHost) {
                 if(window.punishmentTriggered !== serverState.currentPickIndex) {
                     window.punishmentTriggered = serverState.currentPickIndex;
                     const uId = serverState.draftOrder[serverState.currentPickIndex];
                     const u = serverState.users[uId];
-                    const s = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !u.team[x]);
+                    const team = u.team || {}; 
+                    const s = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !team[x] || !team[x].id);
                     let available = availablePlayers.filter(p => !localTakenPlayers[p.id]).sort((a,b) => b.rat - a.rat);
                     if(s && available.length > 0) pushDraftPickToFirebase(available[0], s, uId);
                 }
             }
-        }, 200); // 5 veces por segundo para ser ultra preciso visualmente
+        }, 200); 
     }
 
-    // ==========================================
-    // PANTALLA FINAL ONLINE
-    // ==========================================
+    // FIX 6: Salvavidas en la pantalla de resultados
     function showEndScreen() {
         if(localTimerInterval) clearInterval(localTimerInterval);
         document.getElementById('draft-screen').classList.add('hidden');
@@ -754,7 +668,8 @@
         
         Object.values(serverState.users).forEach((u, i) => {
             const d = document.createElement('div'); d.className = 'glass p-4 end-pitch-container';
-            let sum = 0, count = 0; Object.values(u.team).forEach(p => { if(p) { sum += p.rat; count++; } });
+            let sum = 0, count = 0; 
+            Object.values(u.team || {}).forEach(p => { if(p && p.id) { sum += p.rat; count++; } });
             let avg = count > 0 ? (sum / count).toFixed(1) : "0";
             
             d.innerHTML = `
