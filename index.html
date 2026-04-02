@@ -12,6 +12,10 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
+    <!-- LIBRERÍAS DE FIREBASE (Versión 8) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <script>
         // Tus claves adaptadas al formato correcto
         const firebaseConfig = {
@@ -227,7 +231,7 @@
     let activePosFilters = []; 
     let botCounter = 1;
 
-    // FIX 1: Cambiado de 'null' a strings vacíos "" para que Firebase no los borre nunca
+    // String vacio en vez de null para que Firebase guarde la estructura del equipo intacta
     const emptyTeam = () => ({ POR: "", LD: "", DFC1: "", DFC2: "", LI: "", MC1: "", MC2: "", MC3: "", ED: "", EI: "", DC: "" });
 
     const getPitchHTML = (prefix = "slot") => `
@@ -285,7 +289,7 @@
     }
 
     function createRoom() {
-        if(!db) return alert("Firebase no configurado. Asegúrate de poner tus credenciales en el HTML.");
+        if(!db) return alert("Firebase no configurado.");
         isHost = true;
         currentRoomId = Math.random().toString(36).substr(2, 4).toUpperCase(); 
         
@@ -383,10 +387,12 @@
                     startLocalTimerLoop();
                 }
 
+                // Reproducir animación si hay un pick nuevo
                 if(data.reveal && data.reveal.ts !== (window.lastRevealTs || 0)) {
                     window.lastRevealTs = data.reveal.ts;
                     triggerDramaticReveal(data.reveal);
                 } else if (!isRevealing) {
+                    // Si no estamos reproduciendo una animación, actualiza la pantalla tranquilamente
                     updateDraftUI();
                 }
             }
@@ -433,14 +439,14 @@
         
         renderPlayers();
 
+        // Host mueve a los bots automáticamente
         if(isHost && activeUser.isBot) {
             if(window.botWorkingForIndex !== serverState.currentPickIndex) {
                 window.botWorkingForIndex = serverState.currentPickIndex;
                 let botThinkingTime = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
                 
                 setTimeout(() => {
-                    if (serverState.draftOrder[serverState.currentPickIndex] !== activeUid) return; 
-                    // FIX 2: Salvavidas para el equipo (team = team || {})
+                    if (serverState.draftOrder[serverState.currentPickIndex] !== activeUid || isRevealing) return; 
                     const team = activeUser.team || {};
                     const s = ['DC','EI','ED','MC2','MC1','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !team[x] || !team[x].id);
                     let available = availablePlayers.filter(p => !localTakenPlayers[p.id]);
@@ -470,15 +476,14 @@
         }
     }
 
-    // FIX 3: Salvavidas en la función que dibujaba el campo
     function fillPitchData(team, prefix) {
-        team = team || {}; // Si viene nulo de Firebase, le ponemos un objeto vacío
+        team = team || {}; 
         const slots = ['POR', 'LD', 'DFC1', 'DFC2', 'LI', 'MC1', 'MC2', 'MC3', 'ED', 'EI', 'DC'];
         slots.forEach(slot => {
             const el = document.getElementById(`${prefix}-${slot}`);
             if(!el) return;
             el.className = 'player-card'; 
-            if (team[slot] && team[slot].id) { // Solo lo llena si es un jugador de verdad
+            if (team[slot] && team[slot].id) { 
                 el.classList.add('filled');
                 el.innerHTML = `<span class="font-bold text-yellow-300 text-xs mb-1">${team[slot].rat}</span><span class="font-bold truncate w-full px-1">${team[slot].name}</span>`;
             } else {
@@ -550,7 +555,6 @@
         renderPlayers();
     }
 
-    // FIX 4: Salvavidas al comprobar si el hueco está ocupado
     function selectPitchSlot(prefix, slotId) {
         if(prefix !== "slot" || !pendingPlayer || serverState.draftOrder[serverState.currentPickIndex] !== myUserId || viewingUserId !== myUserId) return;
         const user = serverState.users[myUserId];
@@ -617,12 +621,16 @@
                         if(nextPick >= serverState.draftOrder.length) roomRef.update({ status: 'finished' });
                         else roomRef.update({ currentPickIndex: nextPick, turnEndTime: Date.now() + (turnTime * 1000) });
                     }
+                    
+                    // ESTA LÍNEA ES LA SOLUCIÓN AL BUG: Obligamos a TODOS los clientes (amigos)
+                    // a repintar el turno nuevo inmediatamente después de que termine la animación.
+                    updateDraftUI();
+
                 }, delay + 2500); 
             }, 800);
         }, 500);
     }
 
-    // FIX 5: Salvavidas para el auto-pick del temporizador si se acaba el tiempo
     function startLocalTimerLoop() {
         if(localTimerInterval) clearInterval(localTimerInterval);
         
@@ -641,13 +649,14 @@
                 timerEl.classList.remove('text-red-500');
             }
 
+            // AUTO-PICK DEL HOST PARA CASTIGAR A LOS LENTOS (Y A LOS BOTS)
             if(secLeft === 0 && isHost) {
                 if(window.punishmentTriggered !== serverState.currentPickIndex) {
                     window.punishmentTriggered = serverState.currentPickIndex;
                     const uId = serverState.draftOrder[serverState.currentPickIndex];
                     const u = serverState.users[uId];
                     const team = u.team || {}; 
-                    const s = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !team[x] || !team[x].id);
+                    const s = ['DC','EI','ED','MC2','MC1','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !team[x] || !team[x].id);
                     let available = availablePlayers.filter(p => !localTakenPlayers[p.id]).sort((a,b) => b.rat - a.rat);
                     if(s && available.length > 0) pushDraftPickToFirebase(available[0], s, uId);
                 }
@@ -655,7 +664,6 @@
         }, 200); 
     }
 
-    // FIX 6: Salvavidas en la pantalla de resultados
     function showEndScreen() {
         if(localTimerInterval) clearInterval(localTimerInterval);
         document.getElementById('draft-screen').classList.add('hidden');
