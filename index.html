@@ -12,10 +12,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-    <!-- LIBRERÍAS DE FIREBASE (Versión 8) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
     <script>
         // Tus claves adaptadas al formato correcto
         const firebaseConfig = {
@@ -58,7 +54,7 @@
 
         @keyframes fadeInLetter { 0% { opacity: 0; color: transparent; text-shadow: 0 0 25px #fde047; transform: scale(1.4); } 50% { opacity: 1; color: transparent; text-shadow: 0 0 10px #fde047; transform: scale(1.1); } 100% { opacity: 1; color: #facc15; text-shadow: 0 0 2px rgba(250, 204, 21, 0.4); transform: scale(1); } }
         .animate-scale-in { animation: scaleIn 0.6s forwards; }
-        @keyframes scaleIn { 0% { opacity: 0; transform: scale(0.2); } 80% { transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes scaleIn { 0% { opacity: 0; transform: scale(0.5); } 80% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
         .letter { display: inline-block; opacity: 0; }
         .stat-badge { display: inline-flex; gap: 2px; background: rgba(0,0,0,0.4); padding: 2px 5px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); }
         ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
@@ -72,7 +68,7 @@
         <p class="text-gray-400 mb-6">Prepara tus datos para conectar</p>
 
         <div class="mb-6 text-left bg-black/30 p-4 rounded-lg border border-white/10">
-            <label class="block text-sm text-gray-300 font-bold mb-2"><i class="fas fa-database text-blue-400"></i> Carga BASE_DRAFT_FINAL.csv</label>
+            <label class="block text-sm text-gray-300 font-bold mb-2"><i class="fas fa-database text-blue-400"></i> Carga BBDD (.csv)</label>
             <input type="file" id="csv-file" accept=".csv" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-600 file:text-white cursor-pointer" onchange="loadCSV(event)">
             <div id="csv-status" class="text-xs text-yellow-400 mt-2 font-mono">Esperando archivo...</div>
         </div>
@@ -88,17 +84,13 @@
     <!-- 2. PANTALLA DE SELECCIÓN DE SALA -->
     <div id="step2-screen" class="hidden glass p-10 max-w-md w-full text-center relative z-10">
         <h2 class="text-2xl font-bold mb-6">Lobby Multijugador</h2>
-        
         <button onclick="createRoom()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mb-4 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
             <i class="fas fa-plus-circle"></i> Crear Nueva Sala
         </button>
-        
         <div class="flex items-center gap-4 my-4">
             <div class="h-px bg-white/20 flex-1"></div><span class="text-gray-400 text-sm">O</span><div class="h-px bg-white/20 flex-1"></div>
         </div>
-
         <input type="text" id="input-roomcode" placeholder="Código de la sala" class="w-full mb-4 p-3 bg-white/5 border border-white/10 rounded outline-none focus:border-blue-500 text-center text-xl font-mono uppercase text-white">
-        
         <button onclick="joinRoom()" class="w-full glass-button text-white font-bold py-3 rounded-lg">
             <i class="fas fa-sign-in-alt"></i> Unirse a la Sala
         </button>
@@ -115,9 +107,7 @@
 
         <div class="bg-black/40 rounded-lg border border-white/10 p-4 mb-6 min-h-[200px]">
             <h3 class="text-left font-bold text-sm text-gray-400 mb-3 uppercase">Jugadores Unidos (<span id="lobby-count">1</span>)</h3>
-            <ul id="lobby-players-list" class="flex flex-col gap-2 text-left">
-                <!-- Se rellena con Firebase -->
-            </ul>
+            <ul id="lobby-players-list" class="flex flex-col gap-2 text-left"></ul>
         </div>
 
         <div id="host-controls" class="hidden flex flex-col gap-3">
@@ -133,7 +123,28 @@
         </div>
     </div>
 
-    <!-- 4. PANTALLA PRINCIPAL DEL DRAFT -->
+    <!-- 4. PANTALLA DEL SORTEO ANIMADO -->
+    <div id="lottery-screen" class="hidden w-full min-h-screen fixed top-0 left-0 bg-slate-900/95 z-50 flex-col items-center justify-center p-4">
+        <h1 class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-8 tracking-widest uppercase drop-shadow-lg">Sorteo del Draft</h1>
+
+        <div class="glass p-10 text-center w-full max-w-3xl flex flex-col justify-center items-center relative overflow-hidden" style="min-height: 350px;">
+            <div id="lottery-msg" class="text-2xl md:text-3xl text-gray-300 font-bold mb-6 transition-all duration-300">Mezclando equipos...</div>
+            <div id="lottery-reveal" class="text-5xl md:text-7xl font-black text-white scale-0 transition-transform duration-500 drop-shadow-[0_0_20px_rgba(255,255,255,0.5)]"></div>
+
+            <div id="lottery-top2" class="hidden w-full justify-around items-center mt-6">
+                <div id="top2-left" class="glass p-6 text-2xl md:text-4xl font-black w-[40%] text-center transition-all duration-300 break-words"></div>
+                <div class="text-4xl md:text-6xl font-black text-red-500 px-4 animate-pulse">VS</div>
+                <div id="top2-right" class="glass p-6 text-2xl md:text-4xl font-black w-[40%] text-center transition-all duration-300 break-words"></div>
+            </div>
+        </div>
+
+        <div class="mt-10 w-full max-w-3xl">
+            <h3 class="text-center text-gray-400 font-bold mb-4 uppercase tracking-widest">Orden de Selección</h3>
+            <div id="lottery-results" class="flex flex-col-reverse gap-2"></div>
+        </div>
+    </div>
+
+    <!-- 5. PANTALLA PRINCIPAL DEL DRAFT -->
     <div id="draft-screen" class="hidden w-full max-w-7xl flex-col gap-4 relative z-10">
         <div id="draft-header" class="glass p-4 flex flex-col md:flex-row justify-between items-center transition-all">
             <div class="flex items-center gap-4 mb-4 md:mb-0">
@@ -200,7 +211,7 @@
         </div>
     </div>
 
-    <!-- PANTALLA FINAL -->
+    <!-- 6. PANTALLA FINAL -->
     <div id="end-screen" class="hidden w-full max-w-7xl flex-col gap-6 relative z-10">
         <h1 class="text-4xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-2">RESULTADOS DEL DRAFT</h1>
         <div id="final-pitches-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full"></div>
@@ -208,7 +219,7 @@
 
 <script>
     // ==========================================
-    // VARIABLES ONLINE Y ESTADO
+    // VARIABLES GLOBALES
     // ==========================================
     let availablePlayers = []; 
     let localTakenPlayers = {}; 
@@ -219,7 +230,7 @@
     let isHost = false;
     
     let serverState = {
-        status: 'lobby', host: null, users: {}, draftOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}, reveal: null
+        status: 'lobby', host: null, users: {}, draftOrder: [], lotteryOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}, reveal: null
     };
 
     let viewingUserId = myUserId; 
@@ -231,26 +242,27 @@
     let activePosFilters = []; 
     let botCounter = 1;
 
-    // String vacio en vez de null para que Firebase guarde la estructura del equipo intacta
     const emptyTeam = () => ({ POR: "", LD: "", DFC1: "", DFC2: "", LI: "", MC1: "", MC2: "", MC3: "", ED: "", EI: "", DC: "" });
 
+    // REGLAS DE POSICIÓN PARA AUTO-PICKS Y BOTS
+    const botPosRules = {
+        'DC': ['ST'],
+        'EI': ['LW', 'RW', 'LM'],
+        'ED': ['RW', 'LW', 'RM'],
+        'MC1': ['CAM', 'CDM', 'CM', 'LM', 'RM'],
+        'MC2': ['CAM', 'CDM', 'CM', 'LM', 'RM'],
+        'MC3': ['CAM', 'CDM', 'CM', 'LM', 'RM'],
+        'DFC1': ['CB'],
+        'DFC2': ['CB'],
+        'LI': ['LB'],
+        'LD': ['RB'],
+        'POR': ['GK']
+    };
+
     const getPitchHTML = (prefix = "slot") => `
-        <div class="flex justify-around w-full z-10">
-            <div class="player-card" id="${prefix}-EI" onclick="selectPitchSlot('${prefix}', 'EI')"><span class="text-gray-400 text-xs font-bold">EI</span></div>
-            <div class="player-card" id="${prefix}-DC" onclick="selectPitchSlot('${prefix}', 'DC')"><span class="text-gray-400 text-xs font-bold">DC</span></div>
-            <div class="player-card" id="${prefix}-ED" onclick="selectPitchSlot('${prefix}', 'ED')"><span class="text-gray-400 text-xs font-bold">ED</span></div>
-        </div>
-        <div class="flex justify-around w-full z-10">
-            <div class="player-card" id="${prefix}-MC1" onclick="selectPitchSlot('${prefix}', 'MC1')"><span class="text-gray-400 text-xs font-bold">MC</span></div>
-            <div class="player-card" id="${prefix}-MC2" onclick="selectPitchSlot('${prefix}', 'MC2')"><span class="text-gray-400 text-xs font-bold">MC</span></div>
-            <div class="player-card" id="${prefix}-MC3" onclick="selectPitchSlot('${prefix}', 'MC3')"><span class="text-gray-400 text-xs font-bold">MC</span></div>
-        </div>
-        <div class="flex justify-around w-full z-10">
-            <div class="player-card" id="${prefix}-LI" onclick="selectPitchSlot('${prefix}', 'LI')"><span class="text-gray-400 text-xs font-bold">LI</span></div>
-            <div class="player-card" id="${prefix}-DFC1" onclick="selectPitchSlot('${prefix}', 'DFC1')"><span class="text-gray-400 text-xs font-bold">DFC</span></div>
-            <div class="player-card" id="${prefix}-DFC2" onclick="selectPitchSlot('${prefix}', 'DFC2')"><span class="text-gray-400 text-xs font-bold">DFC</span></div>
-            <div class="player-card" id="${prefix}-LD" onclick="selectPitchSlot('${prefix}', 'LD')"><span class="text-gray-400 text-xs font-bold">LD</span></div>
-        </div>
+        <div class="flex justify-around w-full z-10"><div class="player-card" id="${prefix}-EI" onclick="selectPitchSlot('${prefix}', 'EI')"><span class="text-gray-400 text-xs font-bold">EI</span></div><div class="player-card" id="${prefix}-DC" onclick="selectPitchSlot('${prefix}', 'DC')"><span class="text-gray-400 text-xs font-bold">DC</span></div><div class="player-card" id="${prefix}-ED" onclick="selectPitchSlot('${prefix}', 'ED')"><span class="text-gray-400 text-xs font-bold">ED</span></div></div>
+        <div class="flex justify-around w-full z-10"><div class="player-card" id="${prefix}-MC1" onclick="selectPitchSlot('${prefix}', 'MC1')"><span class="text-gray-400 text-xs font-bold">MC</span></div><div class="player-card" id="${prefix}-MC2" onclick="selectPitchSlot('${prefix}', 'MC2')"><span class="text-gray-400 text-xs font-bold">MC</span></div><div class="player-card" id="${prefix}-MC3" onclick="selectPitchSlot('${prefix}', 'MC3')"><span class="text-gray-400 text-xs font-bold">MC</span></div></div>
+        <div class="flex justify-around w-full z-10"><div class="player-card" id="${prefix}-LI" onclick="selectPitchSlot('${prefix}', 'LI')"><span class="text-gray-400 text-xs font-bold">LI</span></div><div class="player-card" id="${prefix}-DFC1" onclick="selectPitchSlot('${prefix}', 'DFC1')"><span class="text-gray-400 text-xs font-bold">DFC</span></div><div class="player-card" id="${prefix}-DFC2" onclick="selectPitchSlot('${prefix}', 'DFC2')"><span class="text-gray-400 text-xs font-bold">DFC</span></div><div class="player-card" id="${prefix}-LD" onclick="selectPitchSlot('${prefix}', 'LD')"><span class="text-gray-400 text-xs font-bold">LD</span></div></div>
         <div class="flex justify-around w-full z-10"><div class="player-card" id="${prefix}-POR" onclick="selectPitchSlot('${prefix}', 'POR')"><span class="text-gray-400 text-xs font-bold">POR</span></div></div>
     `;
 
@@ -272,7 +284,6 @@
                     pac: parseInt(row.PAC), sho: parseInt(row.SHO), pas: parseInt(row.PAS),
                     dri: parseInt(row.DRI), def: parseInt(row.DEF), pos: row.POS || "N/A"
                 })).filter(p => p.name && !isNaN(p.rat));
-                
                 availablePlayers.sort((a,b) => b.rat - a.rat);
                 statusEl.innerText = `¡Éxito! ${availablePlayers.length} jugadores cargados.`;
                 document.getElementById('btn-next').disabled = false;
@@ -292,7 +303,6 @@
         if(!db) return alert("Firebase no configurado.");
         isHost = true;
         currentRoomId = Math.random().toString(36).substr(2, 4).toUpperCase(); 
-        
         const nick = document.getElementById('input-nick').value.trim();
         const team = document.getElementById('input-team').value.trim();
 
@@ -300,7 +310,7 @@
         roomRef.set({
             status: 'lobby', host: myUserId,
             users: { [myUserId]: { id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false } },
-            draftOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}
+            draftOrder: [], lotteryOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}
         }).then(() => {
             enterLobbyUI(); listenToServer(); roomRef.onDisconnect().remove();
         });
@@ -319,7 +329,6 @@
 
             const nick = document.getElementById('input-nick').value.trim();
             const team = document.getElementById('input-team').value.trim();
-
             roomRef.child('users').child(myUserId).set({
                 id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false
             }).then(() => {
@@ -341,7 +350,7 @@
 
     function copyInviteLink() {
         const url = window.location.origin + window.location.pathname + "?room=" + currentRoomId;
-        navigator.clipboard.writeText(url).then(() => alert("Link copiado: Pásalo a tus amigos!"));
+        navigator.clipboard.writeText(url).then(() => alert("Link copiado!"));
     }
 
     function addBot() {
@@ -354,16 +363,21 @@
 
     function startOnlineDraft() {
         let userIds = Object.keys(serverState.users);
-        userIds = userIds.sort(() => Math.random() - 0.5);
+        let randomizedUserIds = userIds.sort(() => Math.random() - 0.5);
 
         let order = [];
         for (let round = 1; round <= maxRounds; round++) {
-            let roundOrder = [...userIds];
+            let roundOrder = [...randomizedUserIds];
             if (round % 2 === 0) roundOrder.reverse();
             order.push(...roundOrder);
         }
 
-        roomRef.update({ status: 'drafting', draftOrder: order, currentPickIndex: 0, turnEndTime: Date.now() + (turnTime * 1000) });
+        roomRef.update({ 
+            status: 'lottery', 
+            lotteryOrder: randomizedUserIds,
+            draftOrder: order, 
+            currentPickIndex: 0 
+        });
     }
 
     function listenToServer() {
@@ -378,21 +392,37 @@
             if(data.status === 'lobby') {
                 updateLobbyList();
             } 
-            else if(data.status === 'drafting') {
+            else if(data.status === 'lottery') {
                 if(prevStatus === 'lobby') {
                     document.getElementById('lobby-screen').classList.add('hidden');
+                    document.getElementById('lottery-screen').classList.remove('hidden');
+                    document.getElementById('lottery-screen').classList.add('flex');
+                    playLotteryAnimation(data.lotteryOrder);
+                } 
+                else if (!window.lotteryStarted) {
+                    document.getElementById('lobby-screen').classList.add('hidden');
+                    document.getElementById('lottery-screen').classList.remove('hidden');
+                    document.getElementById('lottery-screen').classList.add('flex');
+                    document.getElementById('lottery-msg').innerText = "Sorteo en progreso... espere.";
+                }
+            }
+            else if(data.status === 'drafting') {
+                if(prevStatus === 'lobby' || prevStatus === 'lottery') {
+                    document.getElementById('lobby-screen').classList.add('hidden');
+                    document.getElementById('lottery-screen').classList.remove('flex');
+                    document.getElementById('lottery-screen').classList.add('hidden');
+                    
                     document.getElementById('draft-screen').classList.remove('hidden');
                     document.getElementById('draft-screen').classList.add('flex');
                     document.getElementById('pitch-container').innerHTML = getPitchHTML("slot");
                     startLocalTimerLoop();
+                    updateDraftUI(); 
                 }
 
-                // Reproducir animación si hay un pick nuevo
                 if(data.reveal && data.reveal.ts !== (window.lastRevealTs || 0)) {
                     window.lastRevealTs = data.reveal.ts;
                     triggerDramaticReveal(data.reveal);
                 } else if (!isRevealing) {
-                    // Si no estamos reproduciendo una animación, actualiza la pantalla tranquilamente
                     updateDraftUI();
                 }
             }
@@ -402,6 +432,107 @@
         });
     }
 
+    // ==========================================
+    // ANIMACIÓN DEL SORTEO
+    // ==========================================
+    const delay = ms => new Promise(res => setTimeout(res, ms));
+
+    async function playLotteryAnimation(orderIds) {
+        window.lotteryStarted = true;
+        const msgEl = document.getElementById('lottery-msg');
+        const revealEl = document.getElementById('lottery-reveal');
+        const top2El = document.getElementById('lottery-top2');
+        const resultsEl = document.getElementById('lottery-results');
+        const t1 = document.getElementById('top2-left');
+        const t2 = document.getElementById('top2-right');
+
+        msgEl.innerText = "Mezclando equipos...";
+        revealEl.style.transform = "scale(1)";
+        for(let i=0; i<20; i++) {
+            let randId = orderIds[Math.floor(Math.random() * orderIds.length)];
+            revealEl.innerText = serverState.users[randId].teamName;
+            await delay(120);
+        }
+        revealEl.style.transform = "scale(0)";
+        await delay(500);
+
+        for (let i = orderIds.length - 1; i >= 2; i--) {
+            msgEl.innerText = `En el Pick #${i + 1} elige...`;
+            await delay(1500);
+
+            const teamName = serverState.users[orderIds[i]].teamName;
+            revealEl.innerText = teamName;
+            revealEl.style.transform = "scale(1)";
+            await delay(2500);
+
+            resultsEl.innerHTML = `<div class="bg-white/5 border border-white/10 p-3 rounded flex justify-between animate-scale-in text-xl shadow-lg">
+                <span class="text-gray-400 font-bold">Pick #${i+1}</span>
+                <span class="text-white font-bold">${teamName}</span>
+            </div>` + resultsEl.innerHTML;
+
+            revealEl.style.transform = "scale(0)";
+            await delay(800);
+        }
+
+        msgEl.innerText = "¡SÓLO QUEDAN DOS EQUIPOS!";
+        await delay(2500);
+        msgEl.innerText = "Se disputan el codiciado Pick #1...";
+        
+        top2El.classList.remove('hidden');
+        top2El.classList.add('flex');
+        
+        const showWinnerLeft = Math.random() > 0.5;
+        t1.innerText = showWinnerLeft ? serverState.users[orderIds[0]].teamName : serverState.users[orderIds[1]].teamName;
+        t2.innerText = showWinnerLeft ? serverState.users[orderIds[1]].teamName : serverState.users[orderIds[0]].teamName;
+        
+        await delay(2500);
+        
+        msgEl.innerText = "¡Y EL PICK #1 ES PARA...";
+        for(let i=0; i<8; i++) {
+            t1.classList.toggle('bg-yellow-500/50'); t1.classList.toggle('border-yellow-400');
+            t2.classList.toggle('bg-yellow-500/50'); t2.classList.toggle('border-yellow-400');
+            await delay(300);
+        }
+
+        t1.className = "glass p-6 text-2xl md:text-4xl font-black w-[40%] text-center transition-all duration-500 break-words";
+        t2.className = "glass p-6 text-2xl md:text-4xl font-black w-[40%] text-center transition-all duration-500 break-words";
+        
+        if (showWinnerLeft) {
+            t1.classList.add('bg-yellow-500', 'text-black', 'scale-110', 'shadow-[0_0_30px_rgba(234,179,8,0.8)]');
+            t2.classList.add('opacity-20', 'scale-90');
+        } else {
+            t2.classList.add('bg-yellow-500', 'text-black', 'scale-110', 'shadow-[0_0_30px_rgba(234,179,8,0.8)]');
+            t1.classList.add('opacity-20', 'scale-90');
+        }
+
+        await delay(1500);
+
+        resultsEl.innerHTML = `<div class="bg-white/5 border border-white/10 p-3 rounded flex justify-between animate-scale-in text-xl shadow-lg">
+            <span class="text-gray-400 font-bold">Pick #2</span>
+            <span class="text-white font-bold">${serverState.users[orderIds[1]].teamName}</span>
+        </div>` + resultsEl.innerHTML;
+
+        await delay(1500);
+
+        resultsEl.innerHTML = `<div class="bg-gradient-to-r from-yellow-600/30 to-yellow-400/30 border-2 border-yellow-400 p-4 rounded flex justify-between animate-scale-in text-yellow-300 text-2xl shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+            <span class="font-black">Pick #1 🏆</span>
+            <span class="font-black">${serverState.users[orderIds[0]].teamName}</span>
+        </div>` + resultsEl.innerHTML;
+
+        msgEl.innerText = "¡ORDEN DEFINIDO! PREPARANDO EL DRAFT...";
+
+        if(isHost) {
+            await delay(5000); 
+            roomRef.update({
+                status: 'drafting',
+                turnEndTime: Date.now() + (turnTime * 1000)
+            });
+        }
+    }
+
+    // ==========================================
+    // FUNCIONES DEL DRAFT
+    // ==========================================
     function updateLobbyList() {
         const list = document.getElementById('lobby-players-list');
         list.innerHTML = '';
@@ -416,13 +547,11 @@
 
     function updateDraftUI() {
         document.getElementById('round-indicator').innerText = Math.floor(serverState.currentPickIndex / Object.keys(serverState.users).length) + 1;
-        
         const activeUid = serverState.draftOrder[serverState.currentPickIndex];
         const activeUser = serverState.users[activeUid];
         if(!activeUser) return showEndScreen();
         
         document.getElementById('current-turn-name').innerText = (activeUid === myUserId) ? "¡TU TURNO!" : activeUser.nick;
-        
         const header = document.getElementById('draft-header');
         if(activeUid === myUserId) {
             header.classList.add('my-turn-glow');
@@ -433,13 +562,11 @@
         }
 
         renderTabs();
-        
         const userToView = serverState.users[viewingUserId] || serverState.users[myUserId];
         fillPitchData(userToView.team, "slot");
-        
         renderPlayers();
 
-        // Host mueve a los bots automáticamente
+        // Si es turno de un Bot, el Host calcula el auto-pick inteligente
         if(isHost && activeUser.isBot) {
             if(window.botWorkingForIndex !== serverState.currentPickIndex) {
                 window.botWorkingForIndex = serverState.currentPickIndex;
@@ -447,31 +574,20 @@
                 
                 setTimeout(() => {
                     if (serverState.draftOrder[serverState.currentPickIndex] !== activeUid || isRevealing) return; 
-                    const team = activeUser.team || {};
-                    const s = ['DC','EI','ED','MC2','MC1','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !team[x] || !team[x].id);
-                    let available = availablePlayers.filter(p => !localTakenPlayers[p.id]);
-                    if(s && available.length > 0) {
-                        let sortedForBot = available.sort((a,b) => b.rat - a.rat);
-                        pushDraftPickToFirebase(sortedForBot[0], s, activeUid);
-                    }
+                    makeAutoPick(activeUid);
                 }, botThinkingTime);
             }
         }
     }
 
     function renderTabs() {
-        const div = document.getElementById('team-tabs'); 
-        div.innerHTML = '';
+        const div = document.getElementById('team-tabs'); div.innerHTML = '';
         for(let uid in serverState.users) {
             const u = serverState.users[uid];
             const b = document.createElement('button');
             b.className = `px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${u.id === viewingUserId ? 'bg-blue-600 text-white' : 'bg-white/10 text-gray-400 hover:bg-white/20'}`;
             b.innerText = u.teamName; 
-            b.onclick = () => { 
-                viewingUserId = u.id; 
-                fillPitchData(serverState.users[viewingUserId].team, "slot");
-                renderTabs(); 
-            };
+            b.onclick = () => { viewingUserId = u.id; fillPitchData(serverState.users[viewingUserId].team, "slot"); renderTabs(); };
             div.appendChild(b);
         }
     }
@@ -487,8 +603,7 @@
                 el.classList.add('filled');
                 el.innerHTML = `<span class="font-bold text-yellow-300 text-xs mb-1">${team[slot].rat}</span><span class="font-bold truncate w-full px-1">${team[slot].name}</span>`;
             } else {
-                let defaultText = slot.replace(/[0-9]/g, ''); 
-                el.innerHTML = `<span class="text-gray-400 text-xs font-bold">${defaultText}</span>`;
+                el.innerHTML = `<span class="text-gray-400 text-xs font-bold">${slot.replace(/[0-9]/g, '')}</span>`;
             }
         });
     }
@@ -557,11 +672,8 @@
 
     function selectPitchSlot(prefix, slotId) {
         if(prefix !== "slot" || !pendingPlayer || serverState.draftOrder[serverState.currentPickIndex] !== myUserId || viewingUserId !== myUserId) return;
-        const user = serverState.users[myUserId];
-        const team = user.team || {}; 
-        
+        const team = serverState.users[myUserId].team || {}; 
         if(team[slotId] && team[slotId].id) return alert("Ese hueco ya está ocupado.");
-        
         pushDraftPickToFirebase(pendingPlayer, slotId, myUserId);
     }
 
@@ -588,11 +700,7 @@
         const nameBox = document.getElementById('jumbo-player');
         const posBox = document.getElementById('jumbo-pos');
         
-        jumbo.classList.remove('hidden'); 
-        ratBox.classList.add('hidden'); 
-        ratBox.classList.remove('animate-scale-in');
-        posBox.classList.add('opacity-0'); 
-        nameBox.innerHTML = '';
+        jumbo.classList.remove('hidden'); ratBox.classList.add('hidden'); ratBox.classList.remove('animate-scale-in'); posBox.classList.add('opacity-0'); nameBox.innerHTML = '';
         
         document.getElementById('jumbo-pick').innerText = '#' + pickNum;
         document.getElementById('jumbo-team').innerText = user.teamName;
@@ -604,61 +712,84 @@
             setTimeout(() => {
                 let delay = 0;
                 player.name.split('').forEach(char => {
-                    const span = document.createElement('span');
-                    span.innerHTML = char === ' ' ? '&nbsp;' : char;
-                    span.className = 'letter';
-                    span.style.animation = `fadeInLetter 0.8s ease-out forwards ${delay}ms`;
+                    const span = document.createElement('span'); span.innerHTML = char === ' ' ? '&nbsp;' : char; span.className = 'letter'; span.style.animation = `fadeInLetter 0.8s ease-out forwards ${delay}ms`;
                     nameBox.appendChild(span); delay += 100;
                 });
                 setTimeout(() => posBox.classList.remove('opacity-0'), delay + 200);
                 
                 setTimeout(() => {
-                    isRevealing = false; 
-                    jumbo.classList.add('hidden');
-                    
+                    isRevealing = false; jumbo.classList.add('hidden');
                     if(isHost) {
                         const nextPick = serverState.currentPickIndex + 1;
                         if(nextPick >= serverState.draftOrder.length) roomRef.update({ status: 'finished' });
                         else roomRef.update({ currentPickIndex: nextPick, turnEndTime: Date.now() + (turnTime * 1000) });
                     }
-                    
-                    // ESTA LÍNEA ES LA SOLUCIÓN AL BUG: Obligamos a TODOS los clientes (amigos)
-                    // a repintar el turno nuevo inmediatamente después de que termine la animación.
                     updateDraftUI();
-
                 }, delay + 2500); 
             }, 800);
         }, 500);
     }
 
+    // ==========================================
+    // AUTO-PICK INTELIGENTE (Para Bots y AFKs)
+    // ==========================================
+    function makeAutoPick(uId) {
+        const u = serverState.users[uId];
+        const team = u.team || {};
+        
+        const slotsPriority = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'];
+        let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
+        
+        let chosenSlot = null;
+        let chosenPlayer = null;
+
+        for(let s of slotsPriority) {
+            if(!team[s] || !team[s].id) {
+                // Filtramos por las posiciones específicas de ese hueco
+                let validPlayers = unpickedPlayers.filter(p => {
+                    let pPos = p.pos.split(',').map(str => str.trim().toUpperCase());
+                    return pPos.some(pos => botPosRules[s].includes(pos));
+                });
+
+                if(validPlayers.length > 0) {
+                    validPlayers.sort((a,b) => b.rat - a.rat);
+                    chosenSlot = s;
+                    chosenPlayer = validPlayers[0];
+                    break;
+                }
+            }
+        }
+
+        // Salvavidas: si por algún motivo bizarro se acaban todos los jugadores de una posición,
+        // ficha al de mayor media que quede y lo pone fuera de posición, para que no se congele el juego.
+        if(!chosenPlayer) {
+            chosenSlot = slotsPriority.find(x => !team[x] || !team[x].id);
+            if(unpickedPlayers.length > 0) {
+                chosenPlayer = unpickedPlayers.sort((a,b) => b.rat - a.rat)[0];
+            }
+        }
+
+        if(chosenSlot && chosenPlayer) {
+            pushDraftPickToFirebase(chosenPlayer, chosenSlot, uId);
+        }
+    }
+
     function startLocalTimerLoop() {
         if(localTimerInterval) clearInterval(localTimerInterval);
-        
         localTimerInterval = setInterval(() => {
             if(isRevealing || serverState.status !== 'drafting') return;
-            
             let msLeft = serverState.turnEndTime - Date.now();
             let secLeft = Math.max(0, Math.floor(msLeft / 1000));
-            
             const timerEl = document.getElementById('timer');
             timerEl.innerText = `00:${secLeft < 10 ? '0'+secLeft : secLeft}`;
-            if(secLeft <= 10) {
-                timerEl.classList.add('text-red-500');
-                timerEl.classList.remove('text-green-400', 'text-yellow-400');
-            } else {
-                timerEl.classList.remove('text-red-500');
-            }
+            if(secLeft <= 10) { timerEl.classList.add('text-red-500'); timerEl.classList.remove('text-green-400', 'text-yellow-400'); } 
+            else { timerEl.classList.remove('text-red-500'); }
 
-            // AUTO-PICK DEL HOST PARA CASTIGAR A LOS LENTOS (Y A LOS BOTS)
             if(secLeft === 0 && isHost) {
                 if(window.punishmentTriggered !== serverState.currentPickIndex) {
                     window.punishmentTriggered = serverState.currentPickIndex;
                     const uId = serverState.draftOrder[serverState.currentPickIndex];
-                    const u = serverState.users[uId];
-                    const team = u.team || {}; 
-                    const s = ['DC','EI','ED','MC2','MC1','MC3','DFC1','DFC2','LI','LD','POR'].find(x => !team[x] || !team[x].id);
-                    let available = availablePlayers.filter(p => !localTakenPlayers[p.id]).sort((a,b) => b.rat - a.rat);
-                    if(s && available.length > 0) pushDraftPickToFirebase(available[0], s, uId);
+                    makeAutoPick(uId); // Llamamos al auto-pick inteligente
                 }
             }
         }, 200); 
@@ -666,18 +797,13 @@
 
     function showEndScreen() {
         if(localTimerInterval) clearInterval(localTimerInterval);
-        document.getElementById('draft-screen').classList.add('hidden');
-        document.getElementById('draft-screen').classList.remove('flex');
-        const endScreen = document.getElementById('end-screen');
-        endScreen.classList.remove('hidden'); endScreen.classList.add('flex');
-        
-        const cont = document.getElementById('final-pitches-container');
-        cont.innerHTML = '';
+        document.getElementById('draft-screen').classList.add('hidden'); document.getElementById('draft-screen').classList.remove('flex');
+        const endScreen = document.getElementById('end-screen'); endScreen.classList.remove('hidden'); endScreen.classList.add('flex');
+        const cont = document.getElementById('final-pitches-container'); cont.innerHTML = '';
         
         Object.values(serverState.users).forEach((u, i) => {
-            const d = document.createElement('div'); d.className = 'glass p-4 end-pitch-container';
-            let sum = 0, count = 0; 
-            Object.values(u.team || {}).forEach(p => { if(p && p.id) { sum += p.rat; count++; } });
+            const d = document.createElement('div'); d.className = 'glass p-4 end-pitch-container w-full max-w-sm';
+            let sum = 0, count = 0; Object.values(u.team || {}).forEach(p => { if(p && p.id) { sum += p.rat; count++; } });
             let avg = count > 0 ? (sum / count).toFixed(1) : "0";
             
             d.innerHTML = `
