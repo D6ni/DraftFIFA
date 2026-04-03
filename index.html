@@ -195,7 +195,6 @@
                 <div class="flex gap-4">
                     <div class="flex-1">
                         <label class="text-xs text-gray-400 mb-1 block">Picks que DAS (Tuyos):</label>
-                        <!-- Fíjate que aquí ya no pone <select>, ahora es un <div> -->
                         <div id="trade-give" class="w-full bg-black/50 p-2 rounded h-32 overflow-y-auto border border-white/20 flex flex-col gap-1"></div>
                     </div>
                     <div class="flex-1">
@@ -590,7 +589,6 @@
 
     function showCustomAlert(msg) {
         const alertBox = document.getElementById('custom-alert');
-        if(!alertBox) return alert(msg); // Salvavidas
         document.getElementById('custom-alert-text').innerText = msg;
         alertBox.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-[-20px]');
         alertBox.classList.add('opacity-100', 'translate-y-0');
@@ -661,8 +659,6 @@
         updateDraftTracker();
     }
 
-    // VARIABLES PARA TRADES (Fuera de las funciones para que no se borren)
-    let tradeTargetUid = null;
     let selectedGivePicks = [];
     let selectedGetPicks = [];
 
@@ -671,7 +667,7 @@
         if(targetUid === myUserId || serverState.users[targetUid].isBot) return; 
         
         tradeTargetUid = targetUid;
-        selectedGivePicks = []; // Vaciamos selecciones anteriores
+        selectedGivePicks = []; // Resetea selecciones al abrir
         selectedGetPicks = [];
 
         document.getElementById('trade-panel').classList.remove('hidden');
@@ -687,12 +683,11 @@
         serverState.draftOrder.forEach((uid, i) => {
             if(uid === myUserId) {
                 const isSelected = selectedGivePicks.includes(i);
-                // Creado como un div clickeable en vez de un <option>
-                sGive.innerHTML += `<div onclick="toggleTradePick('give', ${i})" class="p-1.5 text-sm rounded border cursor-pointer select-none transition-all ${isSelected ? 'bg-blue-600 border-blue-400 text-white font-bold' : 'border-white/10 text-gray-300 hover:bg-white/10'}">Pick #${i+1}</div>`;
+                sGive.innerHTML += `<div onclick="toggleTradePick('give', ${i})" class="trade-btn p-1.5 text-sm rounded border border-white/10 text-gray-300 ${isSelected ? 'selected' : 'hover:bg-white/10'}">Pick #${i+1}</div>`;
             }
             if(uid === targetUid) {
                 const isSelected = selectedGetPicks.includes(i);
-                sGet.innerHTML += `<div onclick="toggleTradePick('get', ${i})" class="p-1.5 text-sm rounded border cursor-pointer select-none transition-all ${isSelected ? 'bg-blue-600 border-blue-400 text-white font-bold' : 'border-white/10 text-gray-300 hover:bg-white/10'}">Pick #${i+1}</div>`;
+                sGet.innerHTML += `<div onclick="toggleTradePick('get', ${i})" class="trade-btn p-1.5 text-sm rounded border border-white/10 text-gray-300 ${isSelected ? 'selected' : 'hover:bg-white/10'}">Pick #${i+1}</div>`;
             }
         });
     }
@@ -705,22 +700,14 @@
             if (selectedGetPicks.includes(index)) selectedGetPicks = selectedGetPicks.filter(i => i !== index);
             else selectedGetPicks.push(index);
         }
-        renderTradeButtons(tradeTargetUid); // Repinta para mostrar colores de selección
+        renderTradeButtons(tradeTargetUid);
     }
 
     function sendTradeOffer() {
-        if(selectedGivePicks.length === 0 || selectedGetPicks.length === 0) {
-            return showCustomAlert("Selecciona al menos 1 pick de cada lado");
-        }
+        if(selectedGivePicks.length === 0 || selectedGetPicks.length === 0) return alert("Selecciona al menos 1 pick de cada lado");
 
         const tradeId = "trade_" + Date.now();
-        roomRef.child('trades').child(tradeId).set({ 
-            from: myUserId, 
-            to: tradeTargetUid, 
-            give: selectedGivePicks, 
-            get: selectedGetPicks, 
-            status: 'pending' 
-        });
+        roomRef.child('trades').child(tradeId).set({ from: myUserId, to: tradeTargetUid, give: selectedGivePicks, get: selectedGetPicks, status: 'pending' });
         
         document.getElementById('trade-panel').classList.add('hidden');
         showCustomAlert("¡Oferta enviada! Esperando respuesta...");
