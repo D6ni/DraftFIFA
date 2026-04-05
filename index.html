@@ -69,6 +69,15 @@
 
         ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
 
+        /* SLOT COMPATIBLE (posición del jugador seleccionado encaja aquí) */
+        .compatible-slot { border-color: #a855f7 !important; box-shadow: 0 0 14px rgba(168, 85, 247, 0.7) !important; border-style: solid !important; background: rgba(168, 85, 247, 0.18) !important; }
+        @keyframes compatible-pulse { 0%,100% { box-shadow: 0 0 8px rgba(168,85,247,0.5); } 50% { box-shadow: 0 0 20px rgba(168,85,247,0.9); } }
+        .highlight-slots .compatible-slot { animation: compatible-pulse 1.2s ease-in-out infinite; }
+
+        /* PREDRAFT PICKS SELECCIONADOS */
+        .predraft-give { background: rgba(234,179,8,0.3) !important; border-color: #eab308 !important; box-shadow: 0 0 12px rgba(234,179,8,0.5) !important; transform: translateY(-2px); }
+        .predraft-get  { background: rgba(34,197,94,0.3) !important;  border-color: #22c55e !important; box-shadow: 0 0 12px rgba(34,197,94,0.5) !important;  transform: translateY(-2px); }
+
         /* ANIMACIÓN TICKER NOTICIAS (VELOCIDAD DINÁMICA) */
         @keyframes ticker-scroll {
             0% { transform: translateX(100vw); } /* Empieza fuera por la derecha de la PANTALLA */
@@ -183,9 +192,20 @@
     <div id="predraft-screen" class="hidden w-full max-w-7xl flex-col gap-4 relative z-10">
         <div class="glass p-6 text-center">
             <h2 class="text-3xl font-black text-blue-400 mb-2">FASE DE PRE-DRAFT</h2>
-            <p class="text-gray-300 mb-6">Revisa el orden y negocia intercambios de picks con otros mánagers.</p>
+            <p class="text-gray-300 mb-1">Revisa el orden y negocia intercambios de picks con otros mánagers.</p>
+            <p class="text-xs text-gray-500 mb-6"><i class="fas fa-hand-pointer text-blue-400 mr-1"></i>Haz clic en <span class="text-blue-300 font-bold">tus picks</span> para marcarlos como oferta · Haz clic en los picks de <span class="text-white font-bold">un rival</span> para proponer un intercambio</p>
             
-            <div class="bg-black/40 p-4 rounded-lg border border-white/10 mb-6 overflow-x-auto whitespace-nowrap text-left" id="predraft-board">
+            <!-- Status bar de picks seleccionados -->
+            <div id="predraft-status-bar" class="hidden mb-4 bg-black/50 border border-yellow-500/50 rounded-lg p-3 flex flex-wrap gap-3 items-center justify-between">
+                <div class="flex gap-4 items-center">
+                    <div><span class="text-xs text-yellow-400 font-bold uppercase mr-2">DAS:</span><span id="status-give" class="text-white font-bold">-</span></div>
+                    <div class="text-gray-500">⇄</div>
+                    <div><span class="text-xs text-green-400 font-bold uppercase mr-2">RECIBES:</span><span id="status-get" class="text-white font-bold">-</span></div>
+                </div>
+                <button onclick="clearTradeSelection()" class="text-xs text-red-400 underline hover:text-red-300">Limpiar selección</button>
+            </div>
+
+            <div class="bg-black/40 p-4 rounded-lg border border-white/10 mb-6 text-left" id="predraft-board">
                 <!-- Se rellena con el board completo -->
             </div>
 
@@ -225,14 +245,22 @@
         <div class="w-full bg-black/50 border border-white/10 rounded-lg p-2 flex overflow-x-auto gap-2 items-center" id="draft-tracker"></div>
 
         <div id="draft-header" class="glass p-4 flex flex-col md:flex-row justify-between items-center transition-all">
-            <div class="flex items-center gap-4 mb-4 md:mb-0">
+            <div class="flex items-center gap-4 mb-4 md:mb-0 flex-wrap">
                 <div class="text-sm text-gray-400">Pick Global <span id="round-indicator" class="text-white font-bold text-lg">1</span></div>
-                <div class="h-8 w-px bg-white/20"></div>
+                <div class="h-8 w-px bg-white/20 hidden md:block"></div>
                 <div>Turno de: <span id="current-turn-name" class="font-bold text-xl text-blue-400">...</span></div>
+                <div class="h-8 w-px bg-white/20 hidden md:block"></div>
+                <div id="picks-until-turn-badge" class="hidden text-xs font-bold px-2 py-1 rounded-full bg-white/10 border border-white/20"></div>
             </div>
-            <div class="text-center">
-                <div class="text-xs text-gray-400 uppercase tracking-widest">Tiempo</div>
-                <div id="timer" class="text-4xl font-mono font-bold text-green-400">05:00</div>
+            <div class="flex items-center gap-6">
+                <div class="text-center hidden md:block">
+                    <div class="text-xs text-gray-400 uppercase tracking-widest">Media Equipo</div>
+                    <div id="my-avg-ovr" class="text-2xl font-mono font-bold text-purple-400">-</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-xs text-gray-400 uppercase tracking-widest">Tiempo</div>
+                    <div id="timer" class="text-4xl font-mono font-bold text-green-400">05:00</div>
+                </div>
             </div>
         </div>
 
@@ -255,7 +283,8 @@
                 
                 <!-- Banners de Confirmación -->
                 <div id="placement-banner" class="hidden bg-black/60 border border-yellow-500 p-3 text-center rounded-lg shadow-lg relative z-20">
-                    <div class="text-gray-200 text-sm mb-2">Haz clic en el campo para asignar a <b class="text-yellow-400" id="placement-name"></b></div>
+                    <div class="text-gray-200 text-sm mb-1">Selecciona posición para <b class="text-yellow-400" id="placement-name"></b></div>
+                    <div id="placement-hint" class="text-[10px] text-purple-300 mb-2"><i class="fas fa-map-marker-alt mr-1"></i>Posiciones compatibles resaltadas en <span class="font-bold text-purple-300">morado</span></div>
                     <button id="btn-cancel-pick" onclick="cancelPlacement()" class="text-xs text-red-400 underline">Cancelar</button>
                 </div>
 
@@ -271,7 +300,7 @@
                 <!-- Pestañas Agencia vs War Room -->
                 <div class="flex border-b border-white/10 bg-black/40">
                     <button onclick="switchRightTab('agencia')" id="tab-agencia" class="flex-1 py-3 font-bold text-blue-400 border-b-2 border-blue-400">Agencia Libre</button>
-                    <button onclick="switchRightTab('warroom')" id="tab-warroom" class="flex-1 py-3 font-bold text-gray-400 hover:text-white transition"><i class="fas fa-headset"></i> Asesores</button>
+                    <button onclick="switchRightTab('warroom')" id="tab-warroom" class="flex-1 py-3 font-bold text-gray-400 hover:text-white transition"><i class="fas fa-robot text-yellow-500 mr-1"></i> Asesores</button>
                 </div>
 
                 <!-- Tab: Agencia Libre -->
@@ -292,9 +321,12 @@
 
                 <!-- Tab: War Room -->
                 <div id="panel-warroom" class="hidden flex flex-col flex-1 overflow-y-auto p-4 bg-slate-900/50">
-                    <h3 class="text-yellow-400 font-bold mb-2 uppercase tracking-widest text-sm"><i class="fas fa-chart-line"></i> Informe del Scout</h3>
-                    <p class="text-xs text-gray-400 mb-4">La IA analiza tu plantilla, las carencias de los rivales y la escasez del mercado para recomendarte las mejores opciones matemáticas.</p>
-                    <div id="advisor-recommendations" class="flex flex-col gap-3"></div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-yellow-400 font-bold uppercase tracking-widest text-sm"><i class="fas fa-robot mr-2"></i>Asesores IA</h3>
+                        <div id="picks-turn-counter" class="text-xs px-2 py-1 rounded-full font-bold bg-black/40 border border-white/10"></div>
+                    </div>
+                    <div id="team-needs-summary" class="bg-black/30 border border-white/10 rounded-lg p-2 mb-3 text-xs text-gray-300"></div>
+                    <div id="advisor-recommendations" class="flex flex-col gap-2"></div>
                 </div>
             </div>
         </div>
@@ -337,6 +369,8 @@
     let activePosFilters = []; 
     let botCounter = 1;
     let tradeTargetUid = null;
+    let selectedGivePicks = [];
+    let selectedGetPicks = [];
 
     const emptyTeam = () => ({ POR: "", LD: "", DFC1: "", DFC2: "", LI: "", MC1: "", MC2: "", MC3: "", ED: "", EI: "", DC: "", SUB1: "", SUB2: "", SUB3: "", SUB4: "", SUB5: "" });
 
@@ -646,33 +680,103 @@
 
     function renderPreDraftBoard() {
         const board = document.getElementById('predraft-board');
+        const numPlayers = Object.keys(serverState.users).length;
+        if (numPlayers === 0 || serverState.draftOrder.length === 0) { board.innerHTML = ''; updateDraftTracker(); return; }
+
+        const totalPicks = serverState.draftOrder.length;
+        const numRounds = Math.ceil(totalPicks / numPlayers);
         let html = "";
-        serverState.draftOrder.forEach((uid, index) => {
-            const isMe = uid === myUserId;
-            const u = serverState.users[uid];
-            html += `<div onclick="openTradePanel(${index})" class="inline-block p-3 m-1 border rounded cursor-pointer transition ${isMe ? 'bg-blue-900/50 border-blue-500' : 'bg-white/5 border-white/10 hover:bg-white/20'}">
-                <div class="text-xs text-gray-400">Pick #${index+1}</div>
-                <div class="font-bold ${isMe ? 'text-blue-300' : 'text-white'}">${u.nick}</div>
-            </div>`;
-        });
+
+        for (let r = 0; r < numRounds; r++) {
+            const roundStart = r * numPlayers;
+            const roundEnd = Math.min(roundStart + numPlayers, totalPicks);
+            html += `<div class="mb-3">
+                <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1.5">Ronda ${r + 1}</div>
+                <div class="flex flex-wrap gap-1.5">`;
+            for (let i = roundStart; i < roundEnd; i++) {
+                const uid = serverState.draftOrder[i];
+                const u = serverState.users[uid];
+                if (!u) continue;
+                const isMe = uid === myUserId;
+                const isBot = u.isBot;
+                const isGive = selectedGivePicks.includes(i);
+                const isGet  = selectedGetPicks.includes(i);
+
+                let baseClass = isMe
+                    ? 'bg-blue-900/40 border-blue-600 text-blue-300'
+                    : isBot
+                        ? 'bg-black/20 border-white/10 text-gray-600 cursor-not-allowed opacity-50'
+                        : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/15';
+                let extraClass = '';
+                if (isGive) extraClass = 'predraft-give';
+                else if (isGet) extraClass = 'predraft-get';
+
+                let badge = '';
+                if (isGive) badge = `<span class="block text-[8px] font-black text-yellow-400 leading-none mt-0.5">DAS</span>`;
+                else if (isGet) badge = `<span class="block text-[8px] font-black text-green-400 leading-none mt-0.5">RECIBES</span>`;
+
+                html += `<div onclick="${isBot ? '' : `handlePickClick(${i})`}" 
+                    class="inline-block p-2 border rounded transition-all duration-150 text-center min-w-[72px] ${baseClass} ${extraClass} ${isBot ? '' : 'cursor-pointer'}">
+                    <div class="text-[9px] text-gray-500 leading-none">Pick #${i + 1}</div>
+                    <div class="font-bold text-xs leading-tight mt-0.5">${u.nick}</div>
+                    ${badge}
+                </div>`;
+            }
+            html += `</div></div>`;
+        }
         board.innerHTML = html;
+        updatePreDraftStatusBar();
         updateDraftTracker();
     }
 
-    let selectedGivePicks = [];
-    let selectedGetPicks = [];
+    function handlePickClick(pickIndex) {
+        const uid = serverState.draftOrder[pickIndex];
+        const u = serverState.users[uid];
+        if (!u || u.isBot) return;
 
-    function openTradePanel(targetPickIndex) {
-        const targetUid = serverState.draftOrder[targetPickIndex];
-        if(targetUid === myUserId || serverState.users[targetUid].isBot) return; 
-        
-        tradeTargetUid = targetUid;
-        selectedGivePicks = []; // Resetea selecciones al abrir
-        selectedGetPicks = [];
+        if (uid === myUserId) {
+            // Toggle as a "give" pick directly from the board
+            if (selectedGivePicks.includes(pickIndex)) {
+                selectedGivePicks = selectedGivePicks.filter(i => i !== pickIndex);
+            } else {
+                selectedGivePicks.push(pickIndex);
+            }
+            if (tradeTargetUid) renderTradeButtons(tradeTargetUid);
+        } else {
+            // Pre-select their pick as "get" and open/update trade panel
+            if (tradeTargetUid !== uid) {
+                // Switching target: keep my give picks, reset get picks
+                selectedGetPicks = [];
+                tradeTargetUid = uid;
+            }
+            // Auto-toggle their pick in "get"
+            if (selectedGetPicks.includes(pickIndex)) {
+                selectedGetPicks = selectedGetPicks.filter(i => i !== pickIndex);
+            } else {
+                selectedGetPicks.push(pickIndex);
+            }
+            document.getElementById('trade-panel').classList.remove('hidden');
+            document.getElementById('trade-target-name').innerText = u.nick;
+            renderTradeButtons(uid);
+        }
+        renderPreDraftBoard();
+    }
 
-        document.getElementById('trade-panel').classList.remove('hidden');
-        document.getElementById('trade-target-name').innerText = serverState.users[targetUid].nick;
-        renderTradeButtons(targetUid);
+    function updatePreDraftStatusBar() {
+        const bar = document.getElementById('predraft-status-bar');
+        const giveEl = document.getElementById('status-give');
+        const getEl  = document.getElementById('status-get');
+        if (!bar) return;
+        const hasAny = selectedGivePicks.length > 0 || selectedGetPicks.length > 0;
+        bar.classList.toggle('hidden', !hasAny);
+        giveEl.innerText = selectedGivePicks.length > 0 ? selectedGivePicks.map(i => `#${i+1}`).join(', ') : '-';
+        getEl.innerText  = selectedGetPicks.length  > 0 ? selectedGetPicks.map(i => `#${i+1}`).join(', ')  : '-';
+    }
+
+    function clearTradeSelection() {
+        selectedGivePicks = []; selectedGetPicks = []; tradeTargetUid = null;
+        document.getElementById('trade-panel').classList.add('hidden');
+        renderPreDraftBoard();
     }
 
     function renderTradeButtons(targetUid) {
@@ -705,6 +809,7 @@
             else selectedGetPicks.push(index);
         }
         renderTradeButtons(tradeTargetUid);
+        renderPreDraftBoard(); // Sync visual state on board
     }
 
     function sendTradeOffer() {
@@ -713,6 +818,7 @@
         const tradeId = "trade_" + Date.now();
         roomRef.child('trades').child(tradeId).set({ from: myUserId, to: tradeTargetUid, give: selectedGivePicks, get: selectedGetPicks, status: 'pending' });
         
+        clearTradeSelection();
         document.getElementById('trade-panel').classList.add('hidden');
         showCustomAlert("¡Oferta enviada! Esperando respuesta...");
     }
@@ -743,7 +849,7 @@
 
     function resolveTrade(tradeId, isAccept) {
         const t = serverState.trades[tradeId];
-        if(!isAccept) { roomRef.child('trades').child(tradeId).update({ status: 'rejected' }); return; }
+        if(!isAccept) { roomRef.child('trades').child(tradeId).update({ status: 'rejected' }); showCustomAlert("Oferta rechazada."); return; }
         
         let newOrder = [...serverState.draftOrder];
         t.give.forEach(idx => newOrder[idx] = t.to); 
@@ -762,13 +868,14 @@
 
         roomRef.update({ draftOrder: newOrder });
         roomRef.child('trades').child(tradeId).update({ status: 'accepted' });
+        clearTradeSelection();
         
-        // AQUÍ DISPARAMOS LA NOTICIA AL TICKER CUANDO HAY UN TRADE
         const uFrom = serverState.users[t.from].teamName;
         const uTo = serverState.users[t.to].teamName;
         const giveStr = t.give.map(i => `#${i+1}`).join(', ');
         const getStr = t.get.map(i => `#${i+1}`).join(', ');
         pushNews(`🚨 TRASPASO CONFIRMADO: ${uFrom} envía los picks [${giveStr}] a ${uTo} a cambio de los picks [${getStr}].`);
+        showCustomAlert(`✅ ¡Traspaso aceptado!`);
     }
 
     function endPreDraft() { pushNews("¡ARRANCA EL DRAFT OFICIAL!"); roomRef.update({ status: 'drafting', turnEndTime: Date.now() + (turnTime * 1000) }); }
@@ -790,16 +897,18 @@
     }
 
     function switchRightTab(tab) {
+        const agenciaTab = document.getElementById('tab-agencia');
+        const warroomTab = document.getElementById('tab-warroom');
         if(tab === 'agencia') {
             document.getElementById('panel-agencia').classList.remove('hidden'); document.getElementById('panel-agencia').classList.add('flex');
             document.getElementById('panel-warroom').classList.add('hidden'); document.getElementById('panel-warroom').classList.remove('flex');
-            document.getElementById('tab-agencia').classList.replace('text-gray-400', 'text-blue-400'); document.getElementById('tab-agencia').classList.add('border-b-2', 'border-blue-400');
-            document.getElementById('tab-warroom').classList.replace('text-white', 'text-gray-400');
+            agenciaTab.className = 'flex-1 py-3 font-bold text-blue-400 border-b-2 border-blue-400';
+            warroomTab.className = 'flex-1 py-3 font-bold text-gray-400 hover:text-white transition';
         } else {
             document.getElementById('panel-agencia').classList.add('hidden'); document.getElementById('panel-agencia').classList.remove('flex');
             document.getElementById('panel-warroom').classList.remove('hidden'); document.getElementById('panel-warroom').classList.add('flex');
-            document.getElementById('tab-warroom').classList.replace('text-gray-400', 'text-white');
-            document.getElementById('tab-agencia').classList.replace('text-blue-400', 'text-gray-400'); document.getElementById('tab-agencia').classList.remove('border-b-2', 'border-blue-400');
+            warroomTab.className = 'flex-1 py-3 font-bold text-yellow-400 border-b-2 border-yellow-400';
+            agenciaTab.className = 'flex-1 py-3 font-bold text-gray-400 hover:text-white transition';
             updateAdvisor();
         }
     }
@@ -817,6 +926,31 @@
             header.classList.add('my-turn-glow'); document.getElementById('timer').classList.replace('text-green-400', 'text-yellow-400');
         } else {
             header.classList.remove('my-turn-glow'); document.getElementById('timer').classList.replace('text-yellow-400', 'text-green-400');
+        }
+
+        // Avg OVR display
+        const myTeam = (serverState.users[myUserId] || {}).team || {};
+        let sum = 0, count = 0;
+        Object.values(myTeam).forEach(p => { if(p && p.id) { sum += p.rat; count++; } });
+        const avgEl = document.getElementById('my-avg-ovr');
+        if (avgEl) avgEl.innerText = count > 0 ? (sum / count).toFixed(1) : '-';
+
+        // Picks until turn badge
+        const picksEl = document.getElementById('picks-until-turn-badge');
+        if (picksEl) {
+            if (activeUid === myUserId) {
+                picksEl.innerText = '⚡ TU TURNO'; picksEl.className = 'text-xs font-bold px-2 py-1 rounded-full bg-yellow-500 text-black border border-yellow-400';
+                picksEl.classList.remove('hidden');
+            } else {
+                const p = getPicksUntilMyTurn();
+                if (p > 0) {
+                    picksEl.innerText = p === 1 ? '⚠️ Siguiente turno' : `${p} picks para tu turno`;
+                    picksEl.className = `text-xs font-bold px-2 py-1 rounded-full border ${p === 1 ? 'bg-red-900/60 border-red-500 text-red-300' : p <= 3 ? 'bg-orange-900/40 border-orange-600 text-orange-300' : 'bg-white/10 border-white/20 text-gray-400'}`;
+                    picksEl.classList.remove('hidden');
+                } else {
+                    picksEl.classList.add('hidden');
+                }
+            }
         }
 
         renderTabs();
@@ -887,8 +1021,13 @@
         
         filtered.slice(0, 50).forEach(player => {
             const isPending = pendingPlayer && pendingPlayer.id === player.id;
+            // Show position fit badge when it's my turn
+            const compatSlots = isMyTurn ? getCompatibleSlotsForPlayer(player, myUserId) : [];
+            const hasFit = compatSlots.length > 0;
+            const fitText = hasFit ? compatSlots.map(s => s.replace(/\d/g,'')).join(', ') : '';
+            
             const div = document.createElement('div');
-            div.className = `flex justify-between items-center p-3 rounded-lg border transition ${isPending ? 'bg-yellow-500/20 border-yellow-500' : 'bg-white/5 border-white/10'}`;
+            div.className = `flex justify-between items-center p-3 rounded-lg border transition ${isPending ? 'bg-yellow-500/20 border-yellow-500' : hasFit ? 'bg-white/5 border-white/10 hover:border-purple-500/50' : 'bg-white/5 border-white/10'}`;
             div.innerHTML = `
                 <div class="flex items-center gap-3 flex-1 overflow-hidden">
                     <div class="flex flex-col items-center flex-shrink-0">
@@ -896,7 +1035,10 @@
                         <div class="text-[9px] font-black text-blue-400 mt-1 uppercase">${player.pos.split(',')[0]}</div>
                     </div>
                     <div class="flex flex-col flex-1 min-w-0">
-                        <div class="font-bold text-base truncate text-white">${player.name}</div>
+                        <div class="flex items-center gap-1.5">
+                            <div class="font-bold text-base truncate text-white">${player.name}</div>
+                            ${hasFit && isMyTurn ? `<span class="flex-shrink-0 text-[8px] font-black bg-purple-900/60 border border-purple-500/50 text-purple-300 px-1 rounded">✓ ${fitText}</span>` : ''}
+                        </div>
                         <div class="flex gap-1 mt-1 text-[9px] text-gray-400 flex-wrap">
                             <span class="stat-badge ${sortBy==='pac'?'border-yellow-500 text-yellow-200':''}">PAC <b>${player.pac}</b></span>
                             <span class="stat-badge ${sortBy==='sho'?'border-yellow-500 text-yellow-200':''}">SHO <b>${player.sho}</b></span>
@@ -913,124 +1055,198 @@
     }
 
     // ==========================================
-    // WAR ROOM (ASESOR DE IA) Y DRAFT GRADE
+    // WAR ROOM (ASESOR DE IA MEJORADO) Y DRAFT GRADE
     // ==========================================
 
     function getDraftContextCaches(targetUserId) {
         let oppNeeds = {};
         let topAvail = {};
 
-        // 1. ¿Qué necesitan mis rivales?
         Object.keys(serverState.users).forEach(uid => {
             if (uid !== targetUserId) {
                 let oppTeam = serverState.users[uid].team || {};
                 for (let s of ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR']) {
                     if (!oppTeam[s] || !oppTeam[s].id) {
-                        botPosRules[s].forEach(pos => {
-                            oppNeeds[pos] = (oppNeeds[pos] || 0) + 1;
-                        });
+                        botPosRules[s].forEach(pos => { oppNeeds[pos] = (oppNeeds[pos] || 0) + 1; });
                     }
                 }
             }
         });
 
-        // 2. ¿Cuántos jugadores TOP (Media 85+) quedan vivos en el mercado?
         availablePlayers.forEach(ap => {
             if (!localTakenPlayers[ap.id] && ap.rat >= 85) {
                 let apPosArray = ap.pos.split(',').map(s => s.trim().toUpperCase());
-                apPosArray.forEach(pos => {
-                    topAvail[pos] = (topAvail[pos] || 0) + 1;
-                });
+                apPosArray.forEach(pos => { topAvail[pos] = (topAvail[pos] || 0) + 1; });
             }
         });
 
         return { oppNeeds, topAvail };
     }
 
+    // Returns compatible EMPTY starter slots for the player
+    function getCompatibleSlotsForPlayer(player, userId) {
+        const team = (serverState.users[userId] || {}).team || {};
+        const pPos = player.pos.split(',').map(s => s.trim().toUpperCase());
+        const starterSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'];
+        return starterSlots.filter(s => {
+            if (team[s] && team[s].id) return false;
+            return botPosRules[s].includes('ANY') || pPos.some(pos => botPosRules[s].includes(pos));
+        });
+    }
+
+    // Returns score number only (for bot use)
     function calculatePlayerScore(player, targetUserId, caches) {
-        let targetTeamObj = serverState.users[targetUserId].team || {};
-        let pPosArray = player.pos.split(',').map(s => s.trim().toUpperCase());
-        
-        let totalStats = (player.pac || 0) + (player.sho || 0) + (player.pas || 0) + (player.dri || 0) + (player.def || 0);
-        let baseScore = (player.rat * 20) + (totalStats / 2); 
+        return _scorePlayerFull(player, targetUserId, caches).score;
+    }
 
-        let isStarterNeeded = false;
-        for (let s of ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR']) {
-            if (!targetTeamObj[s] || !targetTeamObj[s].id) {
-                if (pPosArray.some(pos => botPosRules[s].includes(pos))) {
-                    isStarterNeeded = true; break;
-                }
-            }
-        }
-        let needScore = isStarterNeeded ? 1000 : 0; 
+    // Returns rich object for advisor
+    function _scorePlayerFull(player, targetUserId, caches) {
+        const pPosArray = player.pos.split(',').map(s => s.trim().toUpperCase());
+        const totalStats = (player.pac||0)+(player.sho||0)+(player.pas||0)+(player.dri||0)+(player.def||0);
+        const baseScore = (player.rat * 20) + (totalStats / 2);
 
-        // Usamos la memoria ultra-rápida (Caches) en vez de volver a calcularlo
-        let opponentsNeeding = 0;
-        let topAvailable = 0;
+        const compatibleSlots = getCompatibleSlotsForPlayer(player, targetUserId);
+        const isStarterNeeded = compatibleSlots.length > 0;
 
+        let opponentsNeeding = 0, topAvailable = 0;
         pPosArray.forEach(pos => {
             if ((caches.oppNeeds[pos] || 0) > opponentsNeeding) opponentsNeeding = caches.oppNeeds[pos];
             if ((caches.topAvail[pos] || 0) > topAvailable) topAvailable = caches.topAvail[pos];
         });
 
-        let urgencyScore = 0;
-        if (opponentsNeeding > 0) {
-            if (topAvailable <= opponentsNeeding) urgencyScore = 800; 
-            else if (topAvailable <= opponentsNeeding + 2) urgencyScore = 400; 
-            else urgencyScore = 100;
+        let needScore, urgencyScore, urgencyLabel, urgencyColor, reason;
+
+        needScore = isStarterNeeded ? 1000 : 0;
+
+        if (!isStarterNeeded) {
+            urgencyLabel = 'SUPLENTE';
+            urgencyColor = 'text-gray-400';
+            urgencyScore = -500;
+            reason = 'Tu 11 titular ya cubre esta posición.';
+        } else if (opponentsNeeding > 0 && topAvailable <= opponentsNeeding) {
+            urgencyLabel = '🔥 URGENTE';
+            urgencyColor = 'text-red-400';
+            urgencyScore = 1500;
+            reason = `Solo quedan ${topAvailable} de media alta. ¡${opponentsNeeding} rival${opponentsNeeding>1?'es':''} también lo necesitan!`;
+        } else if (opponentsNeeding > 0 && topAvailable <= opponentsNeeding + 2) {
+            urgencyLabel = '⚡ ESCASO';
+            urgencyColor = 'text-orange-400';
+            urgencyScore = 800;
+            reason = `El mercado se está secando (${topAvailable} disponibles, ${opponentsNeeding} rivales buscan esta pos.).`;
+        } else if (isStarterNeeded) {
+            urgencyLabel = '✅ NECESARIO';
+            urgencyColor = 'text-green-400';
+            urgencyScore = 400;
+            reason = `Cubre una carencia real en tu equipo (${compatibleSlots.map(s=>s.replace(/\d/g,'')).join(', ')}).`;
         } else {
-            urgencyScore = -1500; 
+            urgencyLabel = '📊 VALOR';
+            urgencyColor = 'text-blue-400';
+            urgencyScore = 100;
+            reason = 'Alta calidad disponible en el mercado.';
         }
 
-        return baseScore + needScore + urgencyScore;
+        return { score: baseScore + needScore + urgencyScore, urgencyLabel, urgencyColor, reason, compatibleSlots, isStarterNeeded, totalStats };
+    }
+
+    function getPicksUntilMyTurn() {
+        for (let i = serverState.currentPickIndex + 1; i < serverState.draftOrder.length; i++) {
+            if (serverState.draftOrder[i] === myUserId) return i - serverState.currentPickIndex;
+        }
+        return -1;
     }
 
     function updateAdvisor() {
         const warDiv = document.getElementById('advisor-recommendations');
-        if(!warDiv || document.getElementById('panel-warroom').classList.contains('hidden')) return;
+        const needsDiv = document.getElementById('team-needs-summary');
+        const counterEl = document.getElementById('picks-turn-counter');
+        if (!warDiv) return;
 
-        // OPTIMIZACIÓN EXTREMA: Solo analizamos los 300 mejores jugadores disponibles
+        // --- Picks until my turn ---
+        const isMyTurn = serverState.draftOrder[serverState.currentPickIndex] === myUserId;
+        if (counterEl) {
+            if (isMyTurn) {
+                counterEl.innerText = '⚡ ES TU TURNO';
+                counterEl.className = 'text-xs px-2 py-1 rounded-full font-bold bg-yellow-500 text-black border border-yellow-400';
+            } else {
+                const picks = getPicksUntilMyTurn();
+                if (picks === -1) { counterEl.innerText = 'Draft finalizado'; counterEl.className = 'text-xs px-2 py-1 rounded-full font-bold bg-black/40 border border-white/10 text-gray-400'; }
+                else {
+                    const col = picks === 1 ? 'bg-red-900/60 border-red-500 text-red-300' : picks <= 3 ? 'bg-orange-900/60 border-orange-500 text-orange-300' : 'bg-black/40 border-white/10 text-gray-400';
+                    counterEl.innerText = picks === 1 ? '⚠️ Próximo turno!' : `${picks} picks para tu turno`;
+                    counterEl.className = `text-xs px-2 py-1 rounded-full font-bold ${col}`;
+                }
+            }
+        }
+
+        // --- Team needs summary ---
+        if (needsDiv) {
+            const myTeam = (serverState.users[myUserId] || {}).team || {};
+            const allStarters = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'];
+            const emptyStarters = allStarters.filter(s => !myTeam[s] || !myTeam[s].id).map(s => s.replace(/\d/g,''));
+            const uniqueNeeds = [...new Set(emptyStarters)];
+            if (uniqueNeeds.length === 0) {
+                needsDiv.innerHTML = `<span class="text-green-400 font-bold">✅ 11 titular completo</span> <span class="text-gray-400 ml-2">— Ahora busca suplentes de calidad.</span>`;
+            } else {
+                needsDiv.innerHTML = `<span class="text-gray-400 text-[10px] uppercase font-bold mr-2">Carencias:</span>` + uniqueNeeds.map(p => `<span class="inline-block bg-red-900/40 border border-red-600/50 text-red-300 text-[10px] font-bold px-1.5 py-0.5 rounded mr-1">${p}</span>`).join('');
+            }
+        }
+
+        // --- Player recommendations ---
         let topUnpicked = availablePlayers.filter(p => !localTakenPlayers[p.id]).slice(0, 300);
         let caches = getDraftContextCaches(myUserId);
         
-        let scoredPlayers = topUnpicked.map(p => ({ 
-            player: p, 
-            score: calculatePlayerScore(p, myUserId, caches) 
-        }));
-        
-        scoredPlayers.sort((a,b) => b.score - a.score);
+        let scored = topUnpicked.map(p => ({ player: p, ..._scorePlayerFull(p, myUserId, caches) }));
+        scored.sort((a, b) => b.score - a.score);
 
-        let finalRecommendations = [];
+        // Diversify: try to show different positions
+        let finalRecs = [];
         let usedPositions = new Set();
-
-        for (let item of scoredPlayers) {
-            let primaryPos = item.player.pos.split(',')[0].trim().toUpperCase();
+        for (let item of scored) {
+            const primaryPos = item.player.pos.split(',')[0].trim().toUpperCase();
             if (!usedPositions.has(primaryPos)) {
-                finalRecommendations.push(item);
+                finalRecs.push(item);
                 usedPositions.add(primaryPos);
             }
-            if (finalRecommendations.length === 3) break;
+            if (finalRecs.length === 5) break;
         }
 
         warDiv.innerHTML = '';
-        finalRecommendations.forEach((item, i) => {
-            let p = item.player;
-            let color = i === 0 ? 'text-green-400 border-green-500' : 'text-blue-400 border-blue-500';
-            let totalStats = (p.pac||0) + (p.sho||0) + (p.pas||0) + (p.dri||0) + (p.def||0);
+        finalRecs.forEach((item, i) => {
+            const p = item.player;
+            const slotText = item.compatibleSlots.length > 0
+                ? item.compatibleSlots.map(s => s.replace(/\d/g, '')).join(', ')
+                : 'Banquillo';
+            const rankIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '➤';
+            const canPick = isMyTurn && !isRevealing;
             
             warDiv.innerHTML += `
-                <div class="bg-black/40 border border-white/10 p-3 rounded-lg flex items-center justify-between hover:bg-white/5 transition cursor-pointer" onclick="startPlacementDraft('${p.id}'); switchRightTab('agencia');">
-                    <div class="flex items-center gap-3">
-                        <div class="font-black text-xl w-10 text-center ${color}">${p.rat}</div>
-                        <div>
-                            <div class="font-bold text-white">${p.name} <span class="text-[9px] text-gray-400 ml-1">${p.pos.split(',')[0]}</span></div>
-                            <div class="text-[10px] text-yellow-500 mt-1"><i class="fas fa-star"></i> Valor Táctico Ideal (Stats: ${totalStats})</div>
+                <div class="bg-black/40 border border-white/10 rounded-lg p-3 transition hover:border-white/30 hover:bg-white/5 ${canPick ? 'cursor-pointer' : ''}">
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg leading-none">${rankIcon}</span>
+                            <div>
+                                <div class="font-bold text-white text-sm leading-tight">${p.name}</div>
+                                <div class="text-[10px] text-gray-400">${p.pos.split(',').slice(0,3).join(' · ')}</div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end flex-shrink-0">
+                            <div class="font-black text-xl text-yellow-300 leading-none">${p.rat}</div>
+                            <div class="text-[9px] text-gray-500">OVR</div>
                         </div>
                     </div>
-                    <i class="fas fa-chevron-right text-gray-600"></i>
+                    <div class="text-[10px] font-bold ${item.urgencyColor} mb-1">${item.urgencyLabel}</div>
+                    <div class="text-[10px] text-gray-400 mb-2 leading-relaxed">${item.reason}</div>
+                    <div class="flex items-center justify-between">
+                        <div class="text-[9px] text-purple-300"><i class="fas fa-map-marker-alt mr-1"></i>Encaja en: <span class="font-bold">${slotText}</span></div>
+                        ${canPick ? `<button onclick="startPlacementDraft('${p.id}'); switchRightTab('agencia');" class="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black px-2 py-1 rounded shadow transition">FICHAR</button>` : ''}
+                    </div>
                 </div>
             `;
         });
+
+        if (finalRecs.length === 0) {
+            warDiv.innerHTML = `<div class="text-center text-gray-500 text-sm mt-4">No hay jugadores disponibles.</div>`;
+        }
     }
     
 
@@ -1050,14 +1266,33 @@
     // ==========================================
     // CONFIRMACIÓN DE PICKS Y REVELACIÓN
     // ==========================================
+    function highlightCompatibleSlots(player) {
+        const compatible = getCompatibleSlotsForPlayer(player, myUserId);
+        const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5'];
+        allSlots.forEach(slot => {
+            const el = document.getElementById(`slot-${slot}`);
+            if (!el || el.classList.contains('filled')) return;
+            if (compatible.includes(slot) || slot.startsWith('SUB')) {
+                el.classList.add('compatible-slot');
+            }
+        });
+    }
+
+    function clearCompatibleHighlights() {
+        document.querySelectorAll('.compatible-slot').forEach(e => e.classList.remove('compatible-slot'));
+    }
+
     function startPlacementDraft(playerId) {
-        if(isRevealing) return;
+        if (isRevealing) return;
         pendingPlayer = availablePlayers.find(p => p.id === playerId);
+        if (!pendingPlayer) return;
         document.getElementById('pitch-container').classList.add('highlight-slots');
         document.getElementById('placement-name').innerText = pendingPlayer.name;
         document.getElementById('placement-banner').classList.remove('hidden');
         document.getElementById('confirm-banner').classList.add('hidden');
-        if(viewingUserId !== myUserId) { viewingUserId = myUserId; fillPitchData(serverState.users[myUserId].team, "slot"); renderTabs(); }
+        if (viewingUserId !== myUserId) { viewingUserId = myUserId; fillPitchData(serverState.users[myUserId].team, "slot"); renderTabs(); }
+        clearCompatibleHighlights();
+        highlightCompatibleSlots(pendingPlayer);
         renderPlayers();
     }
 
@@ -1066,6 +1301,8 @@
         document.getElementById('pitch-container').classList.remove('highlight-slots');
         document.getElementById('placement-banner').classList.add('hidden');
         document.getElementById('confirm-banner').classList.add('hidden');
+        clearCompatibleHighlights();
+        document.querySelectorAll('.selected-slot').forEach(e => e.classList.remove('selected-slot'));
         renderPlayers();
     }
 
@@ -1102,6 +1339,7 @@
         document.getElementById('pitch-container').classList.remove('highlight-slots');
         document.querySelectorAll('.selected-slot').forEach(e => e.classList.remove('selected-slot'));
         document.getElementById('confirm-banner').classList.add('hidden');
+        clearCompatibleHighlights();
 
         // AQUÍ DISPARAMOS LA NOTICIA AL TICKER CUANDO ALGUIEN FICHA
         const teamName = serverState.users[userId].teamName;
