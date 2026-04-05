@@ -1007,278 +1007,330 @@
     function togglePosFilter(pos) { const idx = activePosFilters.indexOf(pos); if(idx > -1) activePosFilters.splice(idx, 1); else activePosFilters.push(pos); document.querySelectorAll('.pos-pill').forEach(pill => { if(activePosFilters.includes(pill.innerText)) pill.classList.add('active'); else pill.classList.remove('active'); }); renderPlayers(); }
     function clearPosFilters() { activePosFilters = []; document.querySelectorAll('.pos-pill').forEach(pill => pill.classList.remove('active')); renderPlayers(); }
 
-    function renderPlayers() {
-        const listDiv = document.getElementById('players-list');
-        if(!listDiv) return;
-        const searchTerm = document.getElementById('search-input').value.toLowerCase();
-        const sortBy = document.getElementById('sort-filter').value;
-        const isMyTurn = serverState.draftOrder[serverState.currentPickIndex] === myUserId && !isRevealing;
+    // Lista filtrada actual y offset para lazy-load
+    let _playerListFiltered = [];
+    let _playerListOffset   = 0;
+    const PLAYER_BATCH      = 60; // jugadores por tanda
 
-        let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
-        let filtered = unpickedPlayers.filter(p => {
-            return p.name.toLowerCase().includes(searchTerm) && (activePosFilters.length === 0 || activePosFilters.some(f => p.pos.includes(f)));
-        });
+    function _buildPlayerRow(player, isMyTurn, sortBy) {
+        const isPending   = pendingPlayer && pendingPlayer.id === player.id;
+        const compatSlots = isMyTurn ? getCompatibleSlotsForPlayer(player, myUserId) : [];
+        const hasFit      = compatSlots.length > 0;
+        const fitText     = hasFit ? [...new Set(compatSlots.map(s => s.replace(/\d/g,'')))] .join(' / ') : '';
 
-        filtered.sort((a, b) => b[sortBy] - a[sortBy]);
-        listDiv.innerHTML = '';
-        
-        filtered.slice(0, 50).forEach(player => {
-            const isPending = pendingPlayer && pendingPlayer.id === player.id;
-            // Show position fit badge when it's my turn
-            const compatSlots = isMyTurn ? getCompatibleSlotsForPlayer(player, myUserId) : [];
-            const hasFit = compatSlots.length > 0;
-            const fitText = hasFit ? compatSlots.map(s => s.replace(/\d/g,'')).join(', ') : '';
-            
-            const div = document.createElement('div');
-            div.className = `flex justify-between items-center p-3 rounded-lg border transition ${isPending ? 'bg-yellow-500/20 border-yellow-500' : hasFit ? 'bg-white/5 border-white/10 hover:border-purple-500/50' : 'bg-white/5 border-white/10'}`;
-            div.innerHTML = `
-                <div class="flex items-center gap-3 flex-1 overflow-hidden">
-                    <div class="flex flex-col items-center flex-shrink-0">
-                        <div class="bg-black/40 text-yellow-400 font-bold rounded p-1.5 text-base w-11 text-center border border-white/10">${player.rat}</div>
-                        <div class="text-[9px] font-black text-blue-400 mt-1 uppercase">${player.pos.split(',')[0]}</div>
+        const div = document.createElement('div');
+        div.className = `flex justify-between items-center p-2.5 rounded-lg border transition ${
+            isPending  ? 'bg-yellow-500/20 border-yellow-500' :
+            hasFit     ? 'bg-white/5 border-white/10 hover:border-purple-500/40' :
+                         'bg-white/5 border-white/10 hover:bg-white/8'}`;
+        div.innerHTML = `
+            <div class="flex items-center gap-2.5 flex-1 overflow-hidden">
+                <div class="flex flex-col items-center flex-shrink-0 w-10">
+                    <div class="bg-black/50 text-yellow-400 font-bold rounded p-1 text-sm w-full text-center border border-white/10">${player.rat}</div>
+                    <div class="text-[8px] font-black text-blue-400 mt-0.5 uppercase leading-none">${player.pos.split(',')[0].trim()}</div>
+                </div>
+                <div class="flex flex-col flex-1 min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <div class="font-bold text-sm truncate text-white leading-tight">${player.name}</div>
+                        ${hasFit && isMyTurn ? `<span class="flex-shrink-0 text-[7px] font-black bg-purple-900/60 border border-purple-500/40 text-purple-300 px-1 py-0.5 rounded leading-none">✓ ${fitText}</span>` : ''}
                     </div>
-                    <div class="flex flex-col flex-1 min-w-0">
-                        <div class="flex items-center gap-1.5">
-                            <div class="font-bold text-base truncate text-white">${player.name}</div>
-                            ${hasFit && isMyTurn ? `<span class="flex-shrink-0 text-[8px] font-black bg-purple-900/60 border border-purple-500/50 text-purple-300 px-1 rounded">✓ ${fitText}</span>` : ''}
-                        </div>
-                        <div class="flex gap-1 mt-1 text-[9px] text-gray-400 flex-wrap">
-                            <span class="stat-badge ${sortBy==='pac'?'border-yellow-500 text-yellow-200':''}">PAC <b>${player.pac}</b></span>
-                            <span class="stat-badge ${sortBy==='sho'?'border-yellow-500 text-yellow-200':''}">SHO <b>${player.sho}</b></span>
-                            <span class="stat-badge ${sortBy==='pas'?'border-yellow-500 text-yellow-200':''}">PAS <b>${player.pas}</b></span>
-                            <span class="stat-badge ${sortBy==='dri'?'border-yellow-500 text-yellow-200':''}">DRI <b>${player.dri}</b></span>
-                            <span class="stat-badge ${sortBy==='def'?'border-yellow-500 text-yellow-200':''}">DEF <b>${player.def}</b></span>
-                        </div>
+                    <div class="flex gap-1 mt-0.5 text-[8px] text-gray-400 flex-wrap">
+                        <span class="stat-badge ${sortBy==='pac'?'border-yellow-500 text-yellow-200':''}">PAC <b>${player.pac}</b></span>
+                        <span class="stat-badge ${sortBy==='sho'?'border-yellow-500 text-yellow-200':''}">SHO <b>${player.sho}</b></span>
+                        <span class="stat-badge ${sortBy==='pas'?'border-yellow-500 text-yellow-200':''}">PAS <b>${player.pas}</b></span>
+                        <span class="stat-badge ${sortBy==='dri'?'border-yellow-500 text-yellow-200':''}">DRI <b>${player.dri}</b></span>
+                        <span class="stat-badge ${sortBy==='def'?'border-yellow-500 text-yellow-200':''}">DEF <b>${player.def}</b></span>
                     </div>
                 </div>
-                <button onclick="startPlacementDraft('${player.id}')" ${!isMyTurn ? 'disabled' : ''} class="${isPending ? 'bg-yellow-600' : 'glass-button'} text-white px-3 py-2 rounded font-bold text-xs flex-shrink-0">${isPending ? 'Colocar' : 'Fichar'}</button>
-            `;
-            listDiv.appendChild(div);
-        });
+            </div>
+            <button onclick="startPlacementDraft('${player.id}')" ${!isMyTurn ? 'disabled' : ''}
+                class="${isPending ? 'bg-yellow-600' : 'glass-button'} text-white px-2.5 py-1.5 rounded font-bold text-xs flex-shrink-0">
+                ${isPending ? 'Colocar' : 'Fichar'}
+            </button>`;
+        return div;
+    }
+
+    function _appendPlayerBatch(listDiv, isMyTurn, sortBy) {
+        const batch = _playerListFiltered.slice(_playerListOffset, _playerListOffset + PLAYER_BATCH);
+        if (batch.length === 0) return;
+
+        const frag = document.createDocumentFragment();
+        batch.forEach(p => frag.appendChild(_buildPlayerRow(p, isMyTurn, sortBy)));
+        _playerListOffset += batch.length;
+
+        // Sentinel para disparar siguiente tanda al hacer scroll
+        if (_playerListOffset < _playerListFiltered.length) {
+            const sentinel = document.createElement('div');
+            sentinel.className = 'h-6 flex items-center justify-center';
+            sentinel.innerHTML = `<span class="text-[10px] text-gray-600">↓ ${_playerListFiltered.length - _playerListOffset} más</span>`;
+            frag.appendChild(sentinel);
+
+            const obs = new IntersectionObserver(entries => {
+                if (!entries[0].isIntersecting) return;
+                obs.disconnect();
+                sentinel.remove();
+                _appendPlayerBatch(listDiv, isMyTurn, sortBy);
+            }, { root: listDiv, rootMargin: '100px' });
+
+            // Append first, then observe
+            listDiv.appendChild(frag);
+            obs.observe(sentinel);
+        } else {
+            listDiv.appendChild(frag);
+        }
+    }
+
+    function renderPlayers() {
+        const listDiv = document.getElementById('players-list');
+        if (!listDiv) return;
+        const searchTerm = document.getElementById('search-input').value.toLowerCase();
+        const sortBy     = document.getElementById('sort-filter').value;
+        const isMyTurn   = serverState.draftOrder[serverState.currentPickIndex] === myUserId && !isRevealing;
+
+        _playerListFiltered = availablePlayers
+            .filter(p => !localTakenPlayers[p.id] &&
+                p.name.toLowerCase().includes(searchTerm) &&
+                (activePosFilters.length === 0 || activePosFilters.some(f => p.pos.includes(f))))
+            .sort((a, b) => b[sortBy] - a[sortBy]);
+
+        _playerListOffset = 0;
+        listDiv.innerHTML = '';
+        _appendPlayerBatch(listDiv, isMyTurn, sortBy);
     }
 
     // ==========================================
     // WAR ROOM (ASESOR DE IA MEJORADO) Y DRAFT GRADE
     // ==========================================
 
-    // ── SCOUT PERSONAS ──────────────────────────────────────────────
+    // ── SCOUT PERSONAS ────────────────────────────────────────────
     const SCOUTS = [
-        { name: "Roberto Leal",    role: "Director Técnico",   icon: "fa-briefcase",      color: "text-amber-400"   },
-        { name: "Carlos Moya",     role: "Jefe de Ojeadores",  icon: "fa-binoculars",     color: "text-blue-400"    },
-        { name: "Iván Zubieta",    role: "Analista Táctico",   icon: "fa-chart-bar",      color: "text-green-400"   },
-        { name: "Luis Fernández",  role: "Scout Europa",       icon: "fa-map",            color: "text-purple-400"  },
-        { name: "Paco Jiménez",    role: "Scout de Mercado",   icon: "fa-handshake",      color: "text-cyan-400"    },
+        { name: "Roberto Leal",   role: "Director Técnico",  icon: "fa-briefcase",  color: "text-amber-400"  },
+        { name: "Carlos Moya",    role: "Jefe de Ojeadores", icon: "fa-binoculars", color: "text-blue-400"   },
+        { name: "Iván Zubieta",   role: "Analista Táctico",  icon: "fa-chart-bar",  color: "text-green-400"  },
+        { name: "Luis Fernández", role: "Scout Europa",      icon: "fa-map",        color: "text-purple-400" },
+        { name: "Paco Jiménez",   role: "Scout de Mercado",  icon: "fa-handshake",  color: "text-cyan-400"   },
     ];
 
-    // ──────────────────────────────────────────────────────────────────
-    //  MOTOR DE SCOUTING — fórmula completa
-    //  Componentes:
-    //    A) Calidad posicional ponderada (stats relevantes por rol)
-    //    B) Value Over Replacement (VOR): cuánto mejor eres que el siguiente disponible
-    //    C) Necesidad real (¿tienes ese hueco en el 11?)
-    //    D) Escasez de mercado (¿cuántos equivalentes quedan? ¿compiten rivales?)
-    //    E) Bonus gema oculta (stats elite con OVR moderado)
-    // ──────────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────
+    //  MOTOR DE SCOUTING v2 — ESTRATEGIA PRIMERO
+    //
+    //  Jerarquía de etiquetas (de mayor a menor prioridad):
+    //    1. 🏆 MEJOR DEL DRAFT      — VOR élite a nivel global + tu lo necesitas
+    //    2. 🎯 POSICIÓN CRÍTICA      — tú + mayoría de rivales lo necesitan + escasez
+    //    3. 🔥 ÚNICA OPORTUNIDAD     — último de su tipo con nivel élite
+    //    4. ⚡ PICK DE VALOR         — VOR alto + rivalidad real
+    //    5. ✅ OPCIÓN SÓLIDA         — cubre tu necesidad, mercado tranquilo
+    //    6. 💎 GEMA OCULTA           — infravaluado por stats (solo si no hay algo mejor)
+    //    7. 📋 EN EL RADAR           — necesario pero sin urgencia
+    //    8. 🔄 BANQUILLO             — posición ya cubierta
+    // ──────────────────────────────────────────────────────────────
 
     function getDraftContextCaches(targetUserId) {
-        // oppNeeds[pos] = nº de equipos RIVALES ÚNICOS que necesitan esa pos
-        let oppNeeds = {};
-        let topAvail  = {};
+        let oppNeeds = {}; // pos → Nº equipos rivales ÚNICOS que la necesitan
+        let topAvail = {};
 
         Object.keys(serverState.users).forEach(uid => {
-            if (uid !== targetUserId) {
-                const oppTeam = serverState.users[uid].team || {};
-                const rivalSet = new Set();
-                for (let s of ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR']) {
-                    if (!oppTeam[s] || !oppTeam[s].id)
-                        botPosRules[s].forEach(pos => rivalSet.add(pos));
-                }
-                rivalSet.forEach(pos => { oppNeeds[pos] = (oppNeeds[pos] || 0) + 1; });
+            if (uid === targetUserId) return;
+            const rivalSet = new Set();
+            const oppTeam  = serverState.users[uid].team || {};
+            for (const s of ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR']) {
+                if (!oppTeam[s] || !oppTeam[s].id)
+                    botPosRules[s].forEach(p => rivalSet.add(p));
             }
+            rivalSet.forEach(p => { oppNeeds[p] = (oppNeeds[p] || 0) + 1; });
         });
 
         availablePlayers.forEach(ap => {
             if (!localTakenPlayers[ap.id] && ap.rat >= 84) {
                 ap.pos.split(',').map(s => s.trim().toUpperCase())
-                    .forEach(pos => { topAvail[pos] = (topAvail[pos] || 0) + 1; });
+                    .forEach(p => { topAvail[p] = (topAvail[p] || 0) + 1; });
             }
         });
 
-        return { oppNeeds, topAvail, numRivals: Math.max(1, Object.keys(serverState.users).length - 1) };
+        const numRivals = Math.max(1, Object.keys(serverState.users).length - 1);
+        return { oppNeeds, topAvail, numRivals };
     }
 
-    // Slots titulares VACÍOS compatibles, deduplicados por nombre (MC1/MC2/MC3 → un solo "MC")
+    // Slots titulares vacíos donde encaja el jugador (deduplicados por nombre)
     function getCompatibleSlotsForPlayer(player, userId) {
-        const team   = (serverState.users[userId] || {}).team || {};
-        const pPos   = player.pos.split(',').map(s => s.trim().toUpperCase());
+        const team     = (serverState.users[userId] || {}).team || {};
+        const pPos     = player.pos.split(',').map(s => s.trim().toUpperCase());
         const starters = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'];
-        const seen   = new Set();
+        const seen     = new Set();
         return starters.filter(s => {
             if (team[s] && team[s].id) return false;
             if (!(botPosRules[s].includes('ANY') || pPos.some(p => botPosRules[s].includes(p)))) return false;
-            const name = s.replace(/\d/g, '');
+            const name = s.replace(/\d/g,'');
             if (seen.has(name)) return false;
             seen.add(name); return true;
         });
     }
 
-    // ── A) Calidad posicional ponderada ────────────────────────────
+    // Calidad posicional ponderada por rol
     function _positionalQuality(player) {
         const pos = player.pos.split(',').map(s => s.trim().toUpperCase());
-        const r = player.rat, pac = player.pac, sho = player.sho,
-              pas = player.pas, dri = player.dri, def = player.def;
-
-        if (pos.includes('GK'))
-            return r * 28;                                           // GK: OVR es casi todo
-        if (pos.some(p => ['ST','CF'].includes(p)))
-            return r * 12 + sho * 4 + pac * 2.5 + dri * 2;         // Delanteros: gol + velocidad
-        if (pos.some(p => ['LW','RW','LM','RM'].includes(p)))
-            return r * 12 + pac * 3.5 + dri * 3 + sho * 1.5;       // Extremos: velocidad + regate
-        if (pos.some(p => ['CAM'].includes(p)))
-            return r * 12 + dri * 3 + pas * 3 + sho * 2;            // Mediapunta: creatividad
-        if (pos.some(p => ['CM','CDM'].includes(p)))
-            return r * 12 + pas * 3 + def * 2.5 + dri * 2;         // Medios: juego + presión
-        if (pos.some(p => ['LB','RB','LWB','RWB'].includes(p)))
-            return r * 12 + def * 3 + pac * 2.5 + pas * 1.5;       // Laterales: defensa + carrera
-        if (pos.some(p => ['CB'].includes(p)))
-            return r * 12 + def * 4 + pac * 2 + pas * 1;            // Centrales: defensa pura
-        return r * 14 + (pac+sho+pas+dri+def) / 2;
+        const { rat:r, pac, sho, pas, dri, def } = player;
+        if (pos.includes('GK'))                                    return r * 28;
+        if (pos.some(p => ['ST','CF'].includes(p)))                return r*12 + sho*4 + pac*2.5 + dri*2;
+        if (pos.some(p => ['LW','RW','LM','RM'].includes(p)))     return r*12 + pac*3.5 + dri*3 + sho*1.5;
+        if (pos.some(p => ['CAM'].includes(p)))                    return r*12 + dri*3 + pas*3 + sho*2;
+        if (pos.some(p => ['CM','CDM'].includes(p)))               return r*12 + pas*3 + def*2.5 + dri*2;
+        if (pos.some(p => ['LB','RB','LWB','RWB'].includes(p)))   return r*12 + def*3 + pac*2.5 + pas*1.5;
+        if (pos.some(p => ['CB'].includes(p)))                     return r*12 + def*4 + pac*2 + pas*1;
+        return r*14 + (pac+sho+pas+dri+def)/2;
     }
 
-    // ── B) Value Over Replacement (VOR) ────────────────────────────
-    // ¿Cuánto mejor es este jugador que el siguiente disponible en su pos?
+    // VOR: diferencial vs los 4 siguientes disponibles en su posición
     function _calcVOR(player) {
         const pPosArray = player.pos.split(',').map(s => s.trim().toUpperCase());
-        // Buscamos los 4 siguientes jugadores disponibles que jueguen en alguna de sus posiciones
         const replacements = availablePlayers
             .filter(p => !localTakenPlayers[p.id] && p.id !== player.id &&
                 p.pos.split(',').some(pp => pPosArray.includes(pp.trim().toUpperCase())))
             .slice(0, 4);
-
-        if (replacements.length === 0) return { vor: 15, isLastElite: true }; // único de su tipo
-        const avgReplacement = replacements.reduce((s, p) => s + p.rat, 0) / replacements.length;
-        return { vor: player.rat - avgReplacement, isLastElite: false };
+        if (replacements.length === 0) return { vor: 15, nextBest: null, isLastElite: true };
+        const nextBest = replacements[0];
+        const avg      = replacements.reduce((s,p) => s+p.rat, 0) / replacements.length;
+        return { vor: player.rat - avg, nextBest, isLastElite: false };
     }
 
-    // ── E) Detección de gemas ocultas ──────────────────────────────
-    // Un jugador es una "gema" si tiene al menos un stat de élite (≥90) pero OVR < 88
+    // VOR global: diferencial de este jugador respecto al mejor disponible en CUALQUIER posición
+    // Devuelve true si es claramente el mejor pick del draft
+    function _isBestInDraft(player, allScoredByQual) {
+        if (allScoredByQual.length < 2) return true;
+        const myQual   = _positionalQuality(player);
+        const nextQual = allScoredByQual.find(p => p.id !== player.id)?._qual || 0;
+        return (myQual - nextQual) >= 60 && player.rat >= 89; // margen claro + nivel élite
+    }
+
+    // Detección de gema: stat clave >= 90 con OVR < 88
     function _hiddenGemCheck(player) {
         const pos = player.pos.split(',').map(s => s.trim().toUpperCase());
         if (pos.includes('GK')) return { isGem: false };
-
-        // Stats clave según posición
         let keyStats;
-        if (pos.some(p => ['ST','CF'].includes(p)))       keyStats = [player.sho, player.pac];
-        else if (pos.some(p => ['LW','RW','LM','RM'].includes(p))) keyStats = [player.pac, player.dri];
-        else if (pos.some(p => ['CAM','CM'].includes(p))) keyStats = [player.pas, player.dri];
-        else if (pos.some(p => ['CDM'].includes(p)))      keyStats = [player.def, player.pas];
-        else if (pos.some(p => ['CB'].includes(p)))        keyStats = [player.def];
-        else                                               keyStats = [player.pac, player.def];
-
-        const maxKey = Math.max(...keyStats);
-        const isGem  = player.rat < 88 && maxKey >= 90;
-        const gemStat = isGem ? (keyStats[0] >= 90 ? keyStats[0] : keyStats[1]) : 0;
-        return { isGem, gemStat };
+        if (pos.some(p => ['ST','CF'].includes(p)))       keyStats = [{v:player.sho, n:'GOL'},{v:player.pac,n:'PAC'}];
+        else if (pos.some(p => ['LW','RW','LM','RM'].includes(p))) keyStats = [{v:player.pac,n:'PAC'},{v:player.dri,n:'DRI'}];
+        else if (pos.some(p => ['CAM','CM'].includes(p))) keyStats = [{v:player.pas,n:'PAS'},{v:player.dri,n:'DRI'}];
+        else if (pos.some(p => ['CDM'].includes(p)))      keyStats = [{v:player.def,n:'DEF'},{v:player.pas,n:'PAS'}];
+        else if (pos.some(p => ['CB'].includes(p)))       keyStats = [{v:player.def,n:'DEF'}];
+        else                                               keyStats = [{v:player.pac,n:'PAC'},{v:player.def,n:'DEF'}];
+        const best = keyStats.reduce((a,b) => a.v >= b.v ? a : b);
+        return { isGem: player.rat < 88 && best.v >= 90, gemStat: best.v, gemStatName: best.n };
     }
 
-    // ── PUNTUACIÓN TOTAL (bot) ────────────────────────────────────
+    // ─── Puntuación numérica (bot) ────────────────────────────────
     function calculatePlayerScore(player, targetUserId, caches) {
         return _scorePlayerFull(player, targetUserId, caches).score;
     }
 
-    // ── OBJETO COMPLETO (advisor) ─────────────────────────────────
+    // ─── Objeto completo (advisor) ────────────────────────────────
     function _scorePlayerFull(player, targetUserId, caches) {
-        const pPosArray      = player.pos.split(',').map(s => s.trim().toUpperCase());
+        const pPosArray       = player.pos.split(',').map(s => s.trim().toUpperCase());
         const compatibleSlots = getCompatibleSlotsForPlayer(player, targetUserId);
         const isStarterNeeded = compatibleSlots.length > 0;
 
-        // A) Calidad posicional
-        const qualScore = _positionalQuality(player);
+        const qualScore             = _positionalQuality(player);
+        const { vor, nextBest, isLastElite } = _calcVOR(player);
+        const vorScore              = vor * 45 + (isLastElite ? 700 : 0);
+        const needScore             = isStarterNeeded ? 900 : -2500;
 
-        // B) VOR
-        const { vor, isLastElite } = _calcVOR(player);
-        // VOR entre -10 y +15 → escalamos para que sea significativo pero no aplastante
-        const vorScore = vor * 40 + (isLastElite ? 600 : 0);
-
-        // C) Necesidad
-        const needScore = isStarterNeeded ? 900 : -2500;
-
-        // D) Escasez
         let opponentsNeeding = 0, topAvailable = 0;
         pPosArray.forEach(pos => {
-            if ((caches.oppNeeds[pos] || 0) > opponentsNeeding) opponentsNeeding = caches.oppNeeds[pos];
-            if ((caches.topAvail[pos] || 0) > topAvailable) topAvailable = caches.topAvail[pos];
+            if ((caches.oppNeeds[pos]||0) > opponentsNeeding) opponentsNeeding = caches.oppNeeds[pos];
+            if ((caches.topAvail[pos]||0) > topAvailable)     topAvailable     = caches.topAvail[pos];
         });
-        const numRivals = caches.numRivals;
+        const { numRivals } = caches;
+
         let scarcityScore = 0;
         if (isStarterNeeded) {
-            if (topAvailable <= 1)               scarcityScore = 900;  // último disponible
-            else if (topAvailable <= numRivals)  scarcityScore = 600;  // menos que rivales
-            else if (topAvailable <= numRivals + 1) scarcityScore = 300;
-            else                                 scarcityScore = 50;
+            if (topAvailable <= 1)                scarcityScore = 950;
+            else if (topAvailable <= numRivals)   scarcityScore = 650;
+            else if (topAvailable <= numRivals+1) scarcityScore = 320;
+            else                                  scarcityScore = 60;
         }
 
-        // E) Gema oculta
-        const { isGem, gemStat } = _hiddenGemCheck(player);
-        const gemScore = isGem ? 350 : 0;
+        const { isGem, gemStat, gemStatName } = _hiddenGemCheck(player);
+        // La gema solo da bonus si ya es starter-needed (no empuja a posiciones cubiertas)
+        const gemScore = (isGem && isStarterNeeded) ? 300 : 0;
 
         const totalScore = qualScore + vorScore + needScore + scarcityScore + gemScore;
 
-        // ── Etiqueta y razón ──────────────────────────────────────
-        let urgencyLabel, urgencyColor, urgencyBg, reason;
+        // ── Clasificación estratégica ──────────────────────────────
+        let urgencyLabel, urgencyColor, urgencyBg, reason, vsNext = '';
+
+        if (nextBest) {
+            const diff = player.rat - nextBest.rat;
+            vsNext = diff > 0 ? ` (+${diff} sobre ${nextBest.name})` : '';
+        }
+
+        // Cuántos rivales compiten en porcentaje
+        const rivalPct = Math.round((opponentsNeeding / numRivals) * 100);
 
         if (!isStarterNeeded) {
-            urgencyLabel = 'BANQUILLO';
+            urgencyLabel = '🔄 BANQUILLO';
             urgencyColor = 'text-gray-500';
             urgencyBg    = 'bg-gray-900/20 border-gray-700/30';
-            reason = `Tu 11 tiene cubierta esta demarcación. Sería un refuerzo de banquillo.`;
+            reason       = `Tu 11 titular ya tiene cubierta esta demarcación. Valdría como refuerzo de banquillo.`;
 
-        } else if (isLastElite || (topAvailable <= 1 && isStarterNeeded)) {
-            urgencyLabel = '🔥 ÚNICO EN EL MERCADO';
+        } else if (isLastElite && opponentsNeeding >= numRivals && vor >= 3) {
+            // Mejor del draft + todos lo necesitan + escasísimo
+            urgencyLabel = '🏆 MEJOR DEL DRAFT';
+            urgencyColor = 'text-yellow-300';
+            urgencyBg    = 'bg-yellow-950/40 border-yellow-700/50';
+            reason       = `El mejor pick disponible ahora mismo${vsNext}. Todos tus rivales lo necesitan y no hay sustitutos de nivel. Este pick define el draft.`;
+
+        } else if (vor >= 5 && !isLastElite && opponentsNeeding === 0) {
+            // Diferencial enorme en su posición pero sin presión de rivales
+            urgencyLabel = '🏆 EL MEJOR EN SU POS.';
+            urgencyColor = 'text-yellow-300';
+            urgencyBg    = 'bg-yellow-950/40 border-yellow-700/50';
+            reason       = `Nadie en el mercado se le acerca en su demarcación${vsNext}. Los rivales no lo necesitan ahora, pero tampoco habrá otro igual.`;
+
+        } else if (opponentsNeeding >= Math.ceil(numRivals * 0.65) && topAvailable <= numRivals && isStarterNeeded) {
+            // Posición que todos buscan + escasez real = situación crítica
+            urgencyLabel = '🎯 POSICIÓN CRÍTICA';
             urgencyColor = 'text-red-400';
-            urgencyBg    = 'bg-red-950/30 border-red-800/40';
-            reason = `No queda nadie comparable en el mercado. Si lo dejas pasar, no habrá segunda oportunidad.`;
+            urgencyBg    = 'bg-red-950/30 border-red-700/40';
+            const leftover = topAvailable;
+            reason       = `${opponentsNeeding} de ${numRivals} rivales necesitan esta posición y solo quedan ${leftover} de nivel élite. Quien llegue antes gana; el resto se quedará con sobras.`;
 
-        } else if (isGem) {
+        } else if (isLastElite && isStarterNeeded) {
+            urgencyLabel = '🔥 ÚNICA OPORTUNIDAD';
+            urgencyColor = 'text-orange-400';
+            urgencyBg    = 'bg-orange-950/30 border-orange-800/40';
+            reason       = `No hay nadie más de este nivel en el mercado. Dejarlo pasar es asumir que tu equipo tendrá un hueco débil en esta demarcación toda la temporada.`;
+
+        } else if (vor >= 3 && opponentsNeeding >= Math.ceil(numRivals * 0.5)) {
+            urgencyLabel = '⚡ PICK DE VALOR';
+            urgencyColor = 'text-orange-300';
+            urgencyBg    = 'bg-orange-950/20 border-orange-800/30';
+            reason       = `+${vor.toFixed(1)} de diferencial sobre el siguiente disponible${vsNext ? ` (${nextBest?.name})` : ''}. La mitad de tus rivales también lo buscan — cuanto más esperes, más sube la presión.`;
+
+        } else if (isGem && vor >= 1) {
+            // Gema solo aparece si no hay algo más urgente encima
             urgencyLabel = '💎 GEMA OCULTA';
             urgencyColor = 'text-violet-400';
             urgencyBg    = 'bg-violet-950/30 border-violet-700/40';
-            const statName = pPosArray.some(p=>['ST','CF'].includes(p)) ? 'GOL' :
-                             pPosArray.some(p=>['LW','RW','LM','RM'].includes(p)) ? 'PAC' : 'STAT CLAVE';
-            reason = `${gemStat} de ${statName} con una media de ${player.rat}. Infravaluado por el sistema, potencial real superior.`;
+            reason       = `Media ${player.rat} pero ${gemStat} de ${gemStatName}: sus números reales superan lo que marca su ficha. Infravaluado en el mercado actual.`;
 
-        } else if (vor >= 4 && topAvailable <= numRivals && isStarterNeeded) {
-            urgencyLabel = '⚡ FICHAJE PRIORITARIO';
-            urgencyColor = 'text-orange-400';
-            urgencyBg    = 'bg-orange-950/30 border-orange-800/40';
-            reason = `+${vor.toFixed(1)} de diferencial sobre el siguiente disponible. ${opponentsNeeding} rival${opponentsNeeding>1?'es':''}  también necesita esta posición.`;
-
-        } else if (vor >= 2 && isStarterNeeded) {
+        } else if (isStarterNeeded && vor >= 1) {
             urgencyLabel = '✅ OPCIÓN SÓLIDA';
             urgencyColor = 'text-green-400';
-            urgencyBg    = 'bg-green-950/30 border-green-800/40';
-            const slotNames = compatibleSlots.map(s => s.replace(/\d/g,'')).join(', ');
-            reason = `Cubre tu carencia en ${slotNames} y supera en ${vor.toFixed(1)} puntos al siguiente de su tipo. Mercado aún cómodo.`;
+            urgencyBg    = 'bg-green-950/25 border-green-800/30';
+            const slotNames = compatibleSlots.map(s => s.replace(/\d/g,'')).join(' / ');
+            reason       = `Cubre tu carencia en ${slotNames}${vsNext}. Hay tiempo, pero no pierdas de vista el mercado.`;
 
-        } else if (isStarterNeeded) {
+        } else {
             urgencyLabel = '📋 EN EL RADAR';
             urgencyColor = 'text-blue-400';
             urgencyBg    = 'bg-blue-950/20 border-blue-800/30';
-            const slotNames = compatibleSlots.map(s => s.replace(/\d/g,'')).join(', ');
-            reason = `Encaja en ${slotNames}. Hay opciones similares disponibles, no hay urgencia extrema.`;
-
-        } else {
-            urgencyLabel = '📊 VALOR DE MERCADO';
-            urgencyColor = 'text-sky-400';
-            urgencyBg    = 'bg-sky-950/20 border-sky-800/30';
-            reason = `Calidad notable pero tu plantilla no necesita esta posición como titular ahora mismo.`;
+            const slotNames = compatibleSlots.map(s => s.replace(/\d/g,'')).join(' / ');
+            reason       = `Encaja en ${slotNames}. Mercado tranquilo en esta posición, no hay presión inmediata.`;
         }
 
         return {
-            score: totalScore, urgencyLabel, urgencyColor, urgencyBg,
-            reason, compatibleSlots, isStarterNeeded,
-            vor, isLastElite, isGem, gemStat,
-            qualScore, scarcityScore, opponentsNeeding, topAvailable
+            score: totalScore, urgencyLabel, urgencyColor, urgencyBg, reason,
+            compatibleSlots, isStarterNeeded, vor, nextBest, isLastElite, isGem,
+            gemStat, gemStatName, opponentsNeeding, topAvailable, numRivals
         };
     }
 
@@ -1297,48 +1349,44 @@
 
         const isMyTurn = serverState.draftOrder[serverState.currentPickIndex] === myUserId;
 
-        // --- Contador picks ---
+        // Contador picks
         if (counterEl) {
             if (isMyTurn) {
                 counterEl.innerText = '⚡ ES TU TURNO';
                 counterEl.className = 'text-xs px-2 py-1 rounded-full font-bold bg-yellow-500 text-black border border-yellow-400';
             } else {
                 const picks = getPicksUntilMyTurn();
-                if (picks === -1) {
-                    counterEl.innerText = 'Draft finalizado';
-                    counterEl.className = 'text-xs px-2 py-1 rounded-full font-bold bg-black/40 border border-white/10 text-gray-400';
-                } else {
-                    const col = picks === 1 ? 'bg-red-900/60 border-red-500 text-red-300'
-                              : picks <= 3  ? 'bg-orange-900/60 border-orange-500 text-orange-300'
-                              :               'bg-black/40 border-white/10 text-gray-400';
+                if (picks < 0) { counterEl.innerText = 'Draft finalizado'; counterEl.className = 'text-xs px-2 py-1 rounded-full font-bold bg-black/40 border border-white/10 text-gray-400'; }
+                else {
+                    const col = picks === 1 ? 'bg-red-900/60 border-red-500 text-red-300' : picks <= 3 ? 'bg-orange-900/60 border-orange-500 text-orange-300' : 'bg-black/40 border-white/10 text-gray-400';
                     counterEl.innerText = picks === 1 ? '⚠️ Próximo turno!' : `${picks} picks para tu turno`;
                     counterEl.className = `text-xs px-2 py-1 rounded-full font-bold ${col}`;
                 }
             }
         }
 
-        // --- Resumen de carencias ---
+        // Resumen de carencias
         if (needsDiv) {
-            const myTeam = (serverState.users[myUserId] || {}).team || {};
+            const myTeam  = (serverState.users[myUserId] || {}).team || {};
             const starters = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'];
-            const unique = [...new Set(starters.filter(s => !myTeam[s] || !myTeam[s].id).map(s => s.replace(/\d/g,'')))];
+            const unique  = [...new Set(starters.filter(s => !myTeam[s]||!myTeam[s].id).map(s => s.replace(/\d/g,'')))];
             needsDiv.innerHTML = unique.length === 0
                 ? `<span class="text-green-400 font-bold">✅ 11 titular completo</span><span class="text-gray-400 ml-2">— Busca suplentes de calidad.</span>`
                 : `<span class="text-gray-400 text-[10px] uppercase font-bold mr-2">Carencias:</span>` +
                   unique.map(p => `<span class="inline-block bg-red-900/40 border border-red-600/50 text-red-300 text-[10px] font-bold px-1.5 py-0.5 rounded mr-1">${p}</span>`).join('');
         }
 
-        // --- Scoring y recomendaciones ---
-        const topUnpicked = availablePlayers.filter(p => !localTakenPlayers[p.id]).slice(0, 300);
-        const caches      = getDraftContextCaches(myUserId);
-        const scored      = topUnpicked.map(p => ({ player: p, ..._scorePlayerFull(p, myUserId, caches) }))
-                                       .sort((a, b) => b.score - a.score);
+        // Scoring
+        const caches = getDraftContextCaches(myUserId);
+        const scored = availablePlayers
+            .filter(p => !localTakenPlayers[p.id])
+            .slice(0, 300)
+            .map(p => ({ player: p, ..._scorePlayerFull(p, myUserId, caches) }))
+            .sort((a, b) => b.score - a.score);
 
-        // Diversificamos: por slot category, priorizando titulares con score más alto
-        const finalRecs   = [];
+        // Diversificamos: slot category, titulares primero
+        const finalRecs    = [];
         const usedSlotCats = new Set();
-
-        // 1ª pasada — solo titulares necesarios
         for (const item of scored) {
             if (!item.isStarterNeeded) continue;
             const cats = item.compatibleSlots.map(s => s.replace(/\d/g,''));
@@ -1348,7 +1396,7 @@
             }
             if (finalRecs.length === 5) break;
         }
-        // 2ª pasada — rellena con banquillo si no hay 3 titulares
+        // Rellena con banquillo si no hay suficientes titulares
         if (finalRecs.length < 3) {
             for (const item of scored) {
                 if (item.isStarterNeeded) continue;
@@ -1357,33 +1405,35 @@
             }
         }
 
-        // --- Render con estética de equipo de scouting ---
+        // Render
         warDiv.innerHTML = '';
         const canPick = isMyTurn && !isRevealing;
 
         finalRecs.forEach((item, i) => {
             const p     = item.player;
             const scout = SCOUTS[i] || SCOUTS[SCOUTS.length - 1];
-            const slotNames = item.compatibleSlots.length > 0
-                ? [...new Set(item.compatibleSlots.map(s => s.replace(/\d/g,'')))]
-                : null;
-            const slotText = slotNames ? slotNames.join(' / ') : 'Banquillo';
+            const slotText = item.compatibleSlots.length > 0
+                ? [...new Set(item.compatibleSlots.map(s => s.replace(/\d/g,'')))] .join(' / ')
+                : 'Banquillo';
 
-            // Mini barra de VOR visual
+            // Barra VOR
             const vorClamped = Math.min(Math.max(item.vor, -5), 12);
             const vorPct     = Math.round(((vorClamped + 5) / 17) * 100);
             const vorColor   = item.vor >= 4 ? 'bg-green-500' : item.vor >= 1 ? 'bg-yellow-500' : 'bg-red-500';
             const vorLabel   = item.isLastElite ? '∞' : (item.vor >= 0 ? '+' : '') + item.vor.toFixed(1);
 
+            // Contexto de rivales (mini badge)
+            const rivalBadge = item.opponentsNeeding > 0 && item.isStarterNeeded
+                ? `<span class="inline-block text-[8px] font-bold bg-red-900/40 border border-red-700/50 text-red-300 px-1.5 py-0.5 rounded-full ml-1">${item.opponentsNeeding}/${item.numRivals} rivales</span>`
+                : '';
+
             warDiv.innerHTML += `
                 <div class="border rounded-xl overflow-hidden transition hover:brightness-110 ${item.urgencyBg}">
-                    <!-- Cabecera scout -->
                     <div class="flex items-center gap-2 px-3 py-1.5 border-b border-white/5 bg-black/20">
                         <i class="fas ${scout.icon} text-[10px] ${scout.color}"></i>
                         <span class="text-[9px] font-black ${scout.color} uppercase tracking-wider">${scout.name}</span>
                         <span class="text-[9px] text-gray-500 ml-0.5">— ${scout.role}</span>
                     </div>
-                    <!-- Cuerpo -->
                     <div class="p-3">
                         <div class="flex items-start justify-between gap-2 mb-1.5">
                             <div class="min-w-0">
@@ -1395,40 +1445,33 @@
                                 <div class="text-[9px] text-gray-500 leading-none">OVR</div>
                             </div>
                         </div>
-
-                        <!-- Etiqueta urgencia -->
-                        <div class="text-[10px] font-black ${item.urgencyColor} mb-1 tracking-wide">${item.urgencyLabel}</div>
-
-                        <!-- Razón del scout (en cursiva, estilo informe) -->
+                        <div class="flex items-center gap-1 mb-1">
+                            <span class="text-[10px] font-black ${item.urgencyColor} tracking-wide">${item.urgencyLabel}</span>
+                            ${rivalBadge}
+                        </div>
                         <div class="text-[10px] text-gray-300 mb-2 leading-relaxed italic">"${item.reason}"</div>
-
-                        <!-- VOR bar + slots + botón -->
                         <div class="flex items-center gap-2 mb-2">
                             <div class="text-[9px] text-gray-500 flex-shrink-0">VOR</div>
                             <div class="flex-1 bg-black/40 rounded-full h-1.5 overflow-hidden">
-                                <div class="${vorColor} h-full rounded-full transition-all" style="width:${vorPct}%"></div>
+                                <div class="${vorColor} h-full rounded-full" style="width:${vorPct}%"></div>
                             </div>
-                            <div class="text-[9px] font-bold ${item.vor >= 0 ? 'text-green-400' : 'text-red-400'} flex-shrink-0">${vorLabel}</div>
+                            <div class="text-[9px] font-bold ${item.vor >= 0 ? 'text-green-400':'text-red-400'} flex-shrink-0">${vorLabel}</div>
                         </div>
-
                         <div class="flex items-center justify-between">
                             <div class="text-[9px] text-purple-300 flex items-center gap-1">
                                 <i class="fas fa-location-dot text-[8px]"></i>
                                 <span class="font-bold">${slotText}</span>
-                                ${item.topAvailable > 0 ? `<span class="text-gray-600">· ${item.topAvailable} disp.</span>` : ''}
+                                ${item.topAvailable > 0 ? `<span class="text-gray-600">· ${item.topAvailable} élite disp.</span>` : ''}
                             </div>
                             ${canPick ? `<button onclick="startPlacementDraft('${p.id}'); switchRightTab('agencia');" class="bg-blue-700 hover:bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-lg shadow transition">FICHAR</button>` : ''}
                         </div>
                     </div>
-                </div>
-            `;
+                </div>`;
         });
 
-        if (finalRecs.length === 0) {
+        if (finalRecs.length === 0)
             warDiv.innerHTML = `<div class="text-center text-gray-500 text-sm mt-6 italic">El departamento de scouting no tiene informes disponibles.</div>`;
-        }
     }
-    
 
     function getGrade(player) {
         let maxOVR = 0;
