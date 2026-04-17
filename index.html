@@ -1398,10 +1398,18 @@
         }
         // Rellena con banquillo si no hay suficientes titulares
         if (finalRecs.length < 3) {
-            for (const item of scored) {
-                if (item.isStarterNeeded) continue;
-                finalRecs.push(item);
-                if (finalRecs.length === 3) break;
+            const myTeam = (serverState.users[myUserId] || {}).team || {};
+            const benchNeeds = getBenchNeeds(myTeam);
+            const usedInRecs = new Set(finalRecs.map(r => r.player.id));
+            for (const need of benchNeeds) {
+                const candidate = scored.find(item =>
+                    !usedInRecs.has(item.player.id) &&
+                    item.player.pos.split(',').map(x => x.trim().toUpperCase()).some(p => need.includes(p)));
+                if (candidate) {
+                    finalRecs.push(candidate);
+                    usedInRecs.add(candidate.player.id);
+                }
+                if (finalRecs.length >= 5) break;
             }
         }
 
@@ -1474,17 +1482,24 @@
     }
 
     function getGrade(player) {
-        let maxOVR = 0;
-        availablePlayers.forEach(p => { if(!localTakenPlayers[p.id] && p.rat > maxOVR) maxOVR = p.rat; });
-        let diff = maxOVR - player.rat;
-        
-        if (diff <= 0) return { grade: "A+", class: "grade-A" };
-        if (diff <= 2) return { grade: "A", class: "grade-A" };
-        if (diff <= 4) return { grade: "B", class: "grade-B" };
-        if (diff <= 7) return { grade: "C", class: "grade-C" };
-        if (diff <= 10) return { grade: "D", class: "grade-D" };
-        return { grade: "F", class: "grade-F" };
-    }
+    const { vor, isLastElite } = _calcVOR(player);
+    const { isGem } = _hiddenGemCheck(player);
+    const totalPicks = (serverState.draftOrder || []).length;
+    const picksLeft  = totalPicks - (serverState.currentPickIndex || 0);
+    const draftProgress = 1 - (picksLeft / Math.max(totalPicks, 1)); // 0=inicio 1=final
+
+    let gs = vor;
+    if (isLastElite) gs += 8;
+    if (isGem)       gs += 4;
+    gs += draftProgress * 5; // al final del draft cualquier pick decente vale más
+
+    if (gs >= 10) return { grade: "A+", class: "grade-A" };
+    if (gs >= 6)  return { grade: "A",  class: "grade-A" };
+    if (gs >= 3)  return { grade: "B",  class: "grade-B" };
+    if (gs >= 1)  return { grade: "C",  class: "grade-C" };
+    if (gs >= 0)  return { grade: "D",  class: "grade-D" };
+    return { grade: "F", class: "grade-F" };
+}
 
     // ==========================================
     // CONFIRMACIÓN DE PICKS Y REVELACIÓN
@@ -1622,33 +1637,82 @@
     // ==========================================
     // AUTO-PICK BOTS Y TIMEOUT
     // ==========================================
+
+    function getBenchNeeds(team) {
+    const subSlots = ['SUB1','SUB2','SUB3','SUB4','SUB5'];
+    const hasSub = (posList) => subSlots.some(s => team[s]?.id &&
+        team[s].pos?.split(',').map(x => x.trim().toUpperCase()).some(p => posList.includes(p)));
+    const needs = [];
+    if (!hasSub(['GK']))                              needs.push(['GK']);
+    if (!hasSub(['CB','LB','RB','LWB','RWB']))        needs.push(['CB','LB','RB','LWB','RWB']);
+    if (!hasSub(['CM','CDM','CAM','LM','RM']))         needs.push(['CM','CDM','CAM','LM','RM']);
+    if (!hasSub(['ST','CF','LW','RW']))                needs.push(['ST','CF','LW','RW']);
+    needs.push(['GK','CB','LB','RB','CM','CDM','CAM','ST','CF','LW','RW','LM','RM','LWB','RWB']);
+    return needs;
+}
+
+
     function makeAutoPick(uId) {
-        const u = serverState.users[uId];
-        const team = u.team || {};
-        const slotsPriority = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5'];
-        
-        // El bot también usa la optimización para no congelar la sala
-        let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
-        let topUnpickedForBot = unpickedPlayers.slice(0, 300);
-        let caches = getDraftContextCaches(uId);
-        
-        let chosenSlot = null; let chosenPlayer = null;
+    const u = serverState.users[uId];
+    const team = u.team || {};
+    const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5'];
 
-        let scoredPlayers = topUnpickedForBot.map(p => ({ p: p, score: calculatePlayerScore(p, uId, caches) })).sort((a,b) => b.score - a.score);
+    let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
+    let caches = getDraftContextCaches(uId);
+    let scoredPlayers = unpickedPlayers.slice(0, 300)
+        .map(p => ({ p, score: calculatePlayerScore(p, uId, caches) }))
+        .sort((a, b) => b.score - a.score);
 
-        for(let s of slotsPriority) {
-            if(!team[s] || !team[s].id) {
-                let bestForSlot = scoredPlayers.find(item => {
-                    if(botPosRules[s].includes('ANY')) return true;
-                    let pPos = item.p.pos.split(',').map(str => str.trim().toUpperCase());
-                    return pPos.some(pos => botPosRules[s].includes(pos));
-                });
-                if(bestForSlot) { chosenSlot = s; chosenPlayer = bestForSlot.p; break; }
+    let chosenSlot = null, chosenPlayer = null;
+
+    // ── Titulares vacíos: elige por urgencia (escasez + calidad) ──
+    const emptyStarters = allSlots.filter(s => !s.startsWith('SUB') && (!team[s] || !team[s].id));
+    if (emptyStarters.length > 0) {
+        let slotCandidates = [];
+        for (const s of emptyStarters) {
+            const best = scoredPlayers.find(item => {
+                if (botPosRules[s].includes('ANY')) return true;
+                return item.p.pos.split(',').map(x => x.trim().toUpperCase()).some(p => botPosRules[s].includes(p));
+            });
+            if (!best) continue;
+            const eliteLeft = unpickedPlayers.filter(p => {
+                if (p.rat < 84) return false;
+                if (botPosRules[s].includes('ANY')) return true;
+                return p.pos.split(',').map(x => x.trim().toUpperCase()).some(pos => botPosRules[s].includes(pos));
+            }).length;
+            const urgency = best.score + (eliteLeft <= 2 ? 2000 : eliteLeft <= 5 ? 800 : 0);
+            slotCandidates.push({ slot: s, player: best.p, urgency });
+        }
+        if (slotCandidates.length > 0) {
+            slotCandidates.sort((a, b) => b.urgency - a.urgency);
+            chosenSlot = slotCandidates[0].slot;
+            chosenPlayer = slotCandidates[0].player;
+        }
+    }
+
+    // ── Banquillo: cubre necesidades equilibradas ──
+    if (!chosenPlayer) {
+        const benchSlots = allSlots.filter(s => s.startsWith('SUB') && (!team[s] || !team[s].id));
+        if (benchSlots.length > 0) {
+            const benchNeeds = getBenchNeeds(team);
+            for (const need of benchNeeds) {
+                const candidate = unpickedPlayers.find(p =>
+                    p.pos.split(',').map(x => x.trim().toUpperCase()).some(pos => need.includes(pos)));
+                if (candidate) { chosenSlot = benchSlots[0]; chosenPlayer = candidate; break; }
+            }
+            if (!chosenPlayer && unpickedPlayers.length > 0) {
+                chosenSlot = benchSlots[0];
+                chosenPlayer = scoredPlayers[0]?.p || unpickedPlayers[0];
             }
         }
-        if(!chosenPlayer) { chosenSlot = slotsPriority.find(x => !team[x] || !team[x].id); if(unpickedPlayers.length > 0) chosenPlayer = unpickedPlayers[0]; }
-        if(chosenSlot && chosenPlayer) pushDraftPickToFirebase(chosenPlayer, chosenSlot, uId);
     }
+
+    if (!chosenSlot || !chosenPlayer) {
+        chosenSlot = allSlots.find(x => !team[x] || !team[x].id);
+        chosenPlayer = unpickedPlayers[0];
+    }
+    if (chosenSlot && chosenPlayer) pushDraftPickToFirebase(chosenPlayer, chosenSlot, uId);
+}
 
     function startLocalTimerLoop() {
         if(localTimerInterval) clearInterval(localTimerInterval);
