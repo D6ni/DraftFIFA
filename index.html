@@ -465,20 +465,20 @@ function _buildPosBuckets() {
             header: true, 
             skipEmptyLines: true,
             complete: function(results) {
-                availablePlayers = results.data.map(row => ({
-                    id: row.ID, name: row.Name, nameLower: (row.Name||'').toLowerCase(),
-                    pac: parseInt(row.PAC||0), sho: parseInt(row.SHO||0), pas: parseInt(row.PAS||0),
-                    dri: parseInt(row.DRI||0), def: parseInt(row.DEF||0), pos: row.POS || "N/A"
-                })).filter(p => p.name && !isNaN(p.rat));
-                
-                availablePlayers.sort((a,b) => b.rat - a.rat);
-                _buildPosBuckets();
-                
-                statusEl.innerText = `¡Éxito! ${availablePlayers.length} jugadores cargados.`;
-                statusEl.classList.replace('text-yellow-400', 'text-green-400');
-                document.getElementById('btn-next').disabled = false;
-                tryReconnect();
-            },
+    availablePlayers = results.data.map(row => ({
+        id: row.ID, name: row.Name, rat: parseInt(row.OVR),
+        pac: parseInt(row.PAC||0), sho: parseInt(row.SHO||0), pas: parseInt(row.PAS||0),
+        dri: parseInt(row.DRI||0), def: parseInt(row.DEF||0), pos: row.POS || "N/A"
+    })).filter(p => p.name && !isNaN(p.rat));
+
+    availablePlayers.sort((a,b) => b.rat - a.rat);
+    _buildPosBuckets(); // ← solo esta línea añadida aquí
+
+    statusEl.innerText = `¡Éxito! ${availablePlayers.length} jugadores cargados.`;
+    statusEl.classList.replace('text-yellow-400', 'text-green-400');
+    document.getElementById('btn-next').disabled = false;
+    tryReconnect();
+},
             error: function(err) {
                 statusEl.innerText = "Error: No se ha encontrado el archivo db.csv";
                 statusEl.classList.replace('text-yellow-400', 'text-red-500');
@@ -1145,7 +1145,7 @@ _prevActiveUid = activeUid;
 
         _playerListFiltered = availablePlayers
             .filter(p => !localTakenPlayers[p.id] &&
-                p.nameLower.includes(searchTerm) &&
+                p.name.toLowerCase().includes(searchTerm) &&
                 (activePosFilters.length === 0 || activePosFilters.some(f => p.pos.includes(f))))
             .sort((a, b) => b[sortBy] - a[sortBy]);
 
