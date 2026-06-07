@@ -1525,23 +1525,36 @@ _prevActiveUid = activeUid;
             warDiv.innerHTML = `<div class="text-center text-gray-500 text-sm mt-6 italic">El departamento de scouting no tiene informes disponibles.</div>`;
     }
 
-    function getGrade(player) {
-    const { vor, isLastElite } = _calcVOR(player);
-    const { isGem } = _hiddenGemCheck(player);
-    const totalPicks = (serverState.draftOrder || []).length;
-    const picksLeft  = totalPicks - (serverState.currentPickIndex || 0);
-    const draftProgress = 1 - (picksLeft / Math.max(totalPicks, 1)); // 0=inicio 1=final
+    function getGrade(player, userId) {
+    userId = userId || myUserId;
+    const caches = getDraftContextCaches(userId);
 
-    let gs = vor;
-    if (isLastElite) gs += 8;
-    if (isGem)       gs += 4;
-    gs += draftProgress * 5; // al final del draft cualquier pick decente vale más
+    // Pool de jugadores disponibles en este momento (el recién fichado aún no está en localTakenPlayers)
+    const pool = availablePlayers.filter(p => !localTakenPlayers[p.id]);
 
-    if (gs >= 10) return { grade: "A+", class: "grade-A" };
-    if (gs >= 6)  return { grade: "A",  class: "grade-A" };
-    if (gs >= 3)  return { grade: "B",  class: "grade-B" };
-    if (gs >= 1)  return { grade: "C",  class: "grade-C" };
-    if (gs >= 0)  return { grade: "D",  class: "grade-D" };
+    // Si no hay pool (draft casi vacío), pick de lujo
+    if (pool.length === 0) return { grade: "A+", class: "grade-A" };
+
+    // Aseguramos que el jugador fichado esté en el pool aunque por algún timing ya no esté
+    const safePool = pool.find(p => p.id === player.id) ? pool : [...pool, player];
+
+    // Puntuamos cada jugador disponible con el mismo sistema del War Room
+    const scored = safePool
+        .map(p => ({ id: p.id, score: _scorePlayerFull(p, userId, caches).score }))
+        .sort((a, b) => b.score - a.score);
+
+    // Rank del jugador fichado (1 = mejor posible)
+    const rank = scored.findIndex(p => p.id === player.id) + 1;
+    if (rank === 0) return { grade: "A+", class: "grade-A" };
+
+    // Percentil: 0 = el mejor pick posible, 1 = el peor
+    const percentile = rank / scored.length;
+
+    if (percentile <= 0.05) return { grade: "A+", class: "grade-A" };
+    if (percentile <= 0.15) return { grade: "A",  class: "grade-A" };
+    if (percentile <= 0.30) return { grade: "B",  class: "grade-B" };
+    if (percentile <= 0.55) return { grade: "C",  class: "grade-C" };
+    if (percentile <= 0.75) return { grade: "D",  class: "grade-D" };
     return { grade: "F", class: "grade-F" };
 }
 
@@ -1614,7 +1627,7 @@ _prevActiveUid = activeUid;
         updates[`users/${userId}/team/${slotId}`] = player;
         updates[`takenPlayers/${player.id}`] = true;
         
-        let gradeInfo = getGrade(player);
+        let gradeInfo = getGrade(player, userId);
         updates[`reveal`] = { player: player, slotId: slotId, userId: userId, pickNum: serverState.currentPickIndex + 1, ts: Date.now(), grade: gradeInfo.grade, gradeClass: gradeInfo.class };
 
         pendingPlayer = null; pendingSlot = null;
