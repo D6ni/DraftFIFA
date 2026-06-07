@@ -371,6 +371,17 @@
     let pendingSlot = null; 
     let activePosFilters = []; 
     let botCounter = 1;
+    let _posBuckets = {};
+
+function _buildPosBuckets() {
+    _posBuckets = {};
+    availablePlayers.forEach(p => {
+        p.pos.split(',').map(s => s.trim().toUpperCase()).forEach(pos => {
+            if (!_posBuckets[pos]) _posBuckets[pos] = [];
+            _posBuckets[pos].push(p); // ya vienen ordenados por rat desc
+        });
+    });
+}
     let _searchTimer = null;
     let tradeTargetUid = null;
     let selectedGivePicks = [];
@@ -455,12 +466,13 @@
             skipEmptyLines: true,
             complete: function(results) {
                 availablePlayers = results.data.map(row => ({
-                    id: row.ID, name: row.Name, rat: parseInt(row.OVR),
+                    id: row.ID, name: row.Name, nameLower: (row.Name||'').toLowerCase(),
                     pac: parseInt(row.PAC||0), sho: parseInt(row.SHO||0), pas: parseInt(row.PAS||0),
                     dri: parseInt(row.DRI||0), def: parseInt(row.DEF||0), pos: row.POS || "N/A"
                 })).filter(p => p.name && !isNaN(p.rat));
                 
                 availablePlayers.sort((a,b) => b.rat - a.rat);
+                _buildPosBuckets();
                 
                 statusEl.innerText = `¡Éxito! ${availablePlayers.length} jugadores cargados.`;
                 statusEl.classList.replace('text-yellow-400', 'text-green-400');
@@ -1133,7 +1145,7 @@ _prevActiveUid = activeUid;
 
         _playerListFiltered = availablePlayers
             .filter(p => !localTakenPlayers[p.id] &&
-                p.name.toLowerCase().includes(searchTerm) &&
+                p.nameLower.includes(searchTerm) &&
                 (activePosFilters.length === 0 || activePosFilters.some(f => p.pos.includes(f))))
             .sort((a, b) => b[sortBy] - a[sortBy]);
 
@@ -1226,16 +1238,29 @@ _prevActiveUid = activeUid;
 
     // VOR: diferencial vs los 4 siguientes disponibles en su posición
     function _calcVOR(player) {
-        const pPosArray = player.pos.split(',').map(s => s.trim().toUpperCase());
-        const replacements = availablePlayers
-            .filter(p => !localTakenPlayers[p.id] && p.id !== player.id &&
-                p.pos.split(',').some(pp => pPosArray.includes(pp.trim().toUpperCase())))
-            .slice(0, 4);
-        if (replacements.length === 0) return { vor: 15, nextBest: null, isLastElite: true };
-        const nextBest = replacements[0];
-        const avg      = replacements.reduce((s,p) => s+p.rat, 0) / replacements.length;
-        return { vor: player.rat - avg, nextBest, isLastElite: false };
+    const pPosArray = player.pos.split(',').map(s => s.trim().toUpperCase());
+    const seen = new Set([player.id]);
+    const replacements = [];
+
+    // Busca en los buckets ya indexados — O(pocos) en vez de O(16.000)
+    for (const pos of pPosArray) {
+        let found = 0;
+        for (const p of (_posBuckets[pos] || [])) {
+            if (seen.has(p.id) || localTakenPlayers[p.id]) continue;
+            seen.add(p.id);
+            replacements.push(p);
+            if (++found >= 4) break;
+        }
+        if (replacements.length >= 4) break;
     }
+
+    if (replacements.length === 0) return { vor: 15, nextBest: null, isLastElite: true };
+
+    replacements.sort((a, b) => b.rat - a.rat);
+    const top4 = replacements.slice(0, 4);
+    const avg = top4.reduce((s, p) => s + p.rat, 0) / top4.length;
+    return { vor: player.rat - avg, nextBest: top4[0], isLastElite: top4[0].rat < 84 };
+}
 
     // VOR global: diferencial de este jugador respecto al mejor disponible en CUALQUIER posición
     // Devuelve true si es claramente el mejor pick del draft
@@ -1386,6 +1411,8 @@ _prevActiveUid = activeUid;
     }
 
     function updateAdvisor() {
+        const warPanel = document.getElementById('panel-warroom');
+        if (!warPanel || warPanel.classList.contains('hidden')) return;
         const warDiv    = document.getElementById('advisor-recommendations');
         const needsDiv  = document.getElementById('team-needs-summary');
         const counterEl = document.getElementById('picks-turn-counter');
@@ -1527,28 +1554,35 @@ _prevActiveUid = activeUid;
 
     function getGrade(player, userId) {
     userId = userId || myUserId;
-    const caches = getDraftContextCaches(userId);
 
-    // Pool de jugadores disponibles en este momento (el recién fichado aún no está en localTakenPlayers)
+    // Posiciones que aún necesita el equipo (O(slots), barato)
+    const team = (serverState.users[userId] || {}).team || {};
+    const starterSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'];
+    const neededPos = new Set();
+    starterSlots.forEach(s => {
+        if (!team[s] || !team[s].id)
+            (botPosRules[s] || []).forEach(p => { if (p !== 'ANY') neededPos.add(p); });
+    });
+
+    // Score simple O(1) por jugador — sin bucles anidados
+    const score = p => {
+        const fits = p.pos.split(',').map(s => s.trim().toUpperCase()).some(pos => neededPos.has(pos));
+        return p.rat * 100 + (fits ? 5000 : 0);
+    };
+
     const pool = availablePlayers.filter(p => !localTakenPlayers[p.id]);
-
-    // Si no hay pool (draft casi vacío), pick de lujo
     if (pool.length === 0) return { grade: "A+", class: "grade-A" };
 
-    // Aseguramos que el jugador fichado esté en el pool aunque por algún timing ya no esté
+    // Asegura que el jugador fichado esté en el pool
     const safePool = pool.find(p => p.id === player.id) ? pool : [...pool, player];
+    const pickedScore = score(player);
 
-    // Puntuamos cada jugador disponible con el mismo sistema del War Room
-    const scored = safePool
-        .map(p => ({ id: p.id, score: _scorePlayerFull(p, userId, caches).score }))
-        .sort((a, b) => b.score - a.score);
+    // Cuántos jugadores puntúan mejor → rank
+    let rank = 1;
+    safePool.forEach(p => { if (score(p) > pickedScore) rank++; });
 
-    // Rank del jugador fichado (1 = mejor posible)
-    const rank = scored.findIndex(p => p.id === player.id) + 1;
-    if (rank === 0) return { grade: "A+", class: "grade-A" };
-
-    // Percentil: 0 = el mejor pick posible, 1 = el peor
-    const percentile = rank / scored.length;
+    // Percentil 0 = mejor pick posible, 1 = peor
+    const percentile = (rank - 1) / safePool.length;
 
     if (percentile <= 0.05) return { grade: "A+", class: "grade-A" };
     if (percentile <= 0.15) return { grade: "A",  class: "grade-A" };
