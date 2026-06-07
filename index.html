@@ -307,7 +307,7 @@
                 <div id="panel-agencia" class="flex flex-col flex-1 overflow-hidden">
                     <div class="p-4 border-b border-white/10 bg-black/20">
                         <div class="flex gap-2 mb-3">
-                            <input type="text" id="search-input" placeholder="Buscar jugador..." class="flex-1 p-2 bg-white/5 border border-white/10 rounded text-sm text-white outline-none" oninput="renderPlayers()">
+                            <input type="text" id="search-input" placeholder="Buscar jugador..." class="flex-1 p-2 bg-white/5 border border-white/10 rounded text-sm text-white outline-none">
                             <select id="sort-filter" class="p-2 bg-white/5 border border-white/10 rounded text-xs text-white outline-none" onchange="renderPlayers()">
                                 <option value="rat">OVR</option><option value="pac">PAC</option><option value="sho">SHO</option><option value="pas">PAS</option><option value="dri">DRI</option><option value="def">DEF</option>
                             </select>
@@ -371,6 +371,7 @@
     let pendingSlot = null; 
     let activePosFilters = []; 
     let botCounter = 1;
+    let _searchTimer = null;
     let tradeTargetUid = null;
     let selectedGivePicks = [];
     let selectedGetPicks = [];
@@ -403,6 +404,29 @@
         </div>
     `;
 
+
+    function tryReconnect() {
+    const saved = JSON.parse(sessionStorage.getItem('draftSession') || 'null');
+    if (!saved) return;
+    myUserId = saved.userId;
+    currentRoomId = saved.roomId;
+    document.getElementById('input-nick').value = saved.nick;
+    document.getElementById('input-team').value = saved.team;
+    roomRef = db.ref('rooms/' + currentRoomId);
+    roomRef.once('value').then(snap => {
+        const data = snap.val();
+        if (!data || !data.users || !data.users[myUserId] || data.status === 'finished') {
+            sessionStorage.removeItem('draftSession'); return;
+        }
+        isHost = data.host === myUserId;
+        document.getElementById('step1-screen').classList.add('hidden');
+        document.getElementById('news-ticker-container').classList.remove('hidden');
+        enterLobbyUI();
+        listenToServer();
+        showCustomAlert('¡Reconectado a la sala ' + currentRoomId + '!');
+    });
+}
+
     // ==========================================
     // AUTO-CARGA DE DATOS E INICIO
     // ==========================================
@@ -410,6 +434,11 @@
         // 1. Mirar si hay invitación por link
         const urlParams = new URLSearchParams(window.location.search);
         if(urlParams.has('room')) document.getElementById('input-roomcode').value = urlParams.get('room');
+
+        document.getElementById('search-input').addEventListener('input', () => {
+        clearTimeout(_searchTimer);
+        _searchTimer = setTimeout(renderPlayers, 280);
+    });
         
         // 2. Auto-cargar la base de datos (db.csv)
         loadDatabaseAutomatically();
@@ -436,6 +465,7 @@
                 statusEl.innerText = `¡Éxito! ${availablePlayers.length} jugadores cargados.`;
                 statusEl.classList.replace('text-yellow-400', 'text-green-400');
                 document.getElementById('btn-next').disabled = false;
+                tryReconnect();
             },
             error: function(err) {
                 statusEl.innerText = "Error: No se ha encontrado el archivo db.csv";
@@ -465,7 +495,7 @@
             status: 'lobby', host: myUserId,
             users: { [myUserId]: { id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false } },
             draftOrder: [], lotteryOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}, trades: {}, ticker: ["¡La sala está abierta! Esperando mánagers..."]
-        }).then(() => { enterLobbyUI(); listenToServer(); roomRef.onDisconnect().remove(); });
+        }).then(() => { enterLobbyUI(); listenToServer(); roomRef.onDisconnect().remove(); sessionStorage.setItem('draftSession', JSON.stringify({ roomId: currentRoomId, userId: myUserId, nick, team })); });
     }
 
     function joinRoom() {
@@ -474,16 +504,13 @@
         if(!currentRoomId) return alert("Introduce un código.");
         roomRef = db.ref('rooms/' + currentRoomId);
         
-        roomRef.once('value').then(snap => {
-            const data = snap.val();
-            if(!data) return alert("La sala no existe.");
-            if(data.status !== 'lobby') return alert("El draft ya ha empezado.");
-
-            const nick = document.getElementById('input-nick').value.trim();
-            const team = document.getElementById('input-team').value.trim();
-            roomRef.child('users').child(myUserId).set({
-                id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false
-            }).then(() => { enterLobbyUI(); listenToServer(); roomRef.child('users').child(myUserId).onDisconnect().remove(); });
+        roomRef.child('users').child(myUserId).set({
+    id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false
+}).then(() => { 
+    enterLobbyUI(); 
+    listenToServer(); 
+    roomRef.child('users').child(myUserId).onDisconnect().remove();
+    sessionStorage.setItem('draftSession', JSON.stringify({ roomId: currentRoomId, userId: myUserId, nick, team }));
         });
     }
 
@@ -916,11 +943,28 @@
         }
     }
 
+    function playTurnBeep() {
+    try {
+        const ctx = new AudioContext();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(0.3, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        o.start(); o.stop(ctx.currentTime + 0.4);
+    } catch(e) {}
+}
+
+let _prevActiveUid = null; // ← también añade esta variable aquí
+
     function updateDraftUI() {
         updateDraftTracker();
         document.getElementById('round-indicator').innerText = serverState.currentPickIndex + 1;
         const activeUid = serverState.draftOrder[serverState.currentPickIndex];
         const activeUser = serverState.users[activeUid];
+        if (activeUid === myUserId && _prevActiveUid !== myUserId) playTurnBeep();
+_prevActiveUid = activeUid;
         if(!activeUser) return showEndScreen();
         
         document.getElementById('current-turn-name').innerText = (activeUid === myUserId) ? "¡TU TURNO!" : activeUser.nick;
@@ -1772,6 +1816,7 @@
     }
 
     function showEndScreen() {
+        sessionStorage.removeItem('draftSession');
         if(localTimerInterval) clearInterval(localTimerInterval);
         document.getElementById('draft-screen').classList.add('hidden'); document.getElementById('draft-screen').classList.remove('flex');
         const endScreen = document.getElementById('end-screen'); endScreen.classList.remove('hidden'); endScreen.classList.add('flex');
