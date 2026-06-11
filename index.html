@@ -109,7 +109,17 @@
         /* Asegurar que las opciones de los desplegables siempre tengan fondo oscuro */
         select option { background-color: #0f172a; color: white; font-weight: bold; }
 
-    </style>
+/* Forzar tema oscuro en desplegables nativos del navegador */
+select {
+    color-scheme: dark;
+}
+select option {
+    background-color: #0f172a !important; /* Azul muy oscuro casi negro */
+    color: #ffffff !important;
+    padding: 8px !important;
+}
+
+</style>
 </head>
 <body class="p-4 md:p-8 flex flex-col items-center min-h-screen relative">
 
@@ -334,12 +344,12 @@
                         <div class="flex gap-2 mb-3">
                             <input type="text" id="search-input" placeholder="Buscar jugador..." class="flex-1 p-2 bg-white/5 border border-white/10 rounded text-sm text-white outline-none">
                             <select id="sort-filter" class="p-2 bg-black/60 border border-white/20 rounded text-xs text-white outline-none focus:border-blue-500 hover:border-white/40 cursor-pointer shadow-lg transition-all" onchange="renderPlayers()">
-                                <option value="rat" class="bg-slate-900 text-white">🏆 OVR (Media)</option>
-                                <option value="pac" class="bg-slate-900 text-white">⚡ PAC (Ritmo)</option>
-                                <option value="sho" class="bg-slate-900 text-white">🎯 SHO (Tiro)</option>
-                                <option value="pas" class="bg-slate-900 text-white">👟 PAS (Pase)</option>
-                                <option value="dri" class="bg-slate-900 text-white">🔮 DRI (Regate)</option>
-                                <option value="def" class="bg-slate-900 text-white">🛡️ DEF (Defensa)</option>
+                                <option value="rat" style="background: #0f172a; color: white;">🏆 OVR (Media)</option>
+                                <option value="pac" style="background: #0f172a; color: white;">⚡ PAC (Ritmo)</option>
+                                <option value="sho" style="background: #0f172a; color: white;">🎯 SHO (Tiro)</option>
+                                <option value="pas" style="background: #0f172a; color: white;">👟 PAS (Pase)</option>
+                                <option value="dri" style="background: #0f172a; color: white;">🔮 DRI (Regate)</option>
+                                <option value="def" style="background: #0f172a; color: white;">🛡️ DEF (Defensa)</option>
                             </select>
                         </div>
                         <div class="flex flex-wrap gap-1.5" id="pos-filter-container">
@@ -2335,8 +2345,8 @@ function _renderPickSection() {
     let html = `<select id="pick-trade-rival" onchange="selectPickRival(this.value)"
         class="w-full p-2.5 rounded-lg text-xs text-white outline-none mb-2 focus:border-indigo-500 hover:border-white/30 cursor-pointer transition-all shadow-lg"
         style="background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.2)">
-        <option value="" class="bg-slate-900 text-white">🤝 Selecciona rival...</option>
-    ${rivals.map(u => `<option class="bg-slate-900 text-white font-bold" value="${u}" ${_draftPickTarget===u?'selected':''}>${users[u].nick}</option>`).join('')}
+        <option value="" style="background: #0f172a; color: white;">🤝 Selecciona rival...</option>
+    ${rivals.map(u => `<option style="background: #0f172a; color: white; font-weight: bold;" value="${u}" ${_draftPickTarget===u?'selected':''}>${users[u].nick}</option>`).join('')}
 </select>`;
 
 if (_draftPickTarget) {
