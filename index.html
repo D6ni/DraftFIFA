@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Draft FIFA | 6Ni</title>
+    <link rel="icon" type="image/x-icon" href="favicon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -413,6 +414,13 @@ select option {
             <!-- 7. PANTALLA FINAL (GALARDONES) -->
             <div id="end-screen" class="hidden w-full max-w-7xl flex-col gap-6 relative z-10 py-10">
                 <h1 class="text-4xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-2">RESULTADOS DEL DRAFT</h1>
+
+                <!-- Botón de Descarga TXT -->
+                <div class="text-center w-full mb-2">
+                    <button onclick="downloadTeamsTxt()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.5)] transition inline-flex items-center gap-2 cursor-pointer">
+                        <i class="fas fa-file-download text-xl"></i> Descargar Plantillas (.txt)
+                    </button>
+                </div>
 
                 <div class="glass p-6 mb-4">
                     <h2 class="text-2xl font-bold text-center mb-6 uppercase tracking-widest text-gray-300">Premios de la Temporada</h2>
@@ -2116,6 +2124,50 @@ function pushDraftPickToFirebase(player, slotId, userId) {
             document.getElementById(`final-${i}`).innerHTML = getPitchHTML(`f-${i}`);
             fillPitchData(u.team, `f-${i}`);
         });
+    }
+
+    function downloadTeamsTxt() {
+        if (!serverState || !serverState.users) return;
+        
+        let txt = `========================================\n`;
+        txt += `   RESULTADOS DEL DRAFT (SALA: ${currentRoomId})\n`;
+        txt += `========================================\n\n`;
+        
+        // Orden en el que se imprimirán las posiciones
+        const slotsOrder = [
+            'POR', 'LD', 'DFC1', 'DFC2', 'LI', 
+            'MC1', 'MC2', 'MC3', 'ED', 'EI', 'DC', 
+            'SUB1', 'SUB2', 'SUB3', 'SUB4', 'SUB5', 'SUB6', 'SUB7', 'SUB8', 'SUB9'
+        ];
+        
+        Object.values(serverState.users).forEach(u => {
+            txt += `Manager: ${u.nick}\n`;
+            txt += `Equipo: ${u.teamName}\n`;
+            txt += `------------------------\n`;
+            
+            let team = u.team || {};
+            slotsOrder.forEach(slot => {
+                let player = team[slot];
+                // Si hay jugador, pone el nombre y su media. Si no, pone "Vacío"
+                let playerText = (player && player.id) ? `${player.name} (${player.rat})` : "Vacío";
+                
+                // Formateo visual: alineamos las posiciones (DFC1 -> DFC1, SUB1 -> SUB1)
+                txt += `${slot}: ${playerText}\n`;
+            });
+            txt += `\n========================================\n\n`;
+        });
+        
+        // Crear el archivo y forzar la descarga
+        const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Draft_Plantillas_${currentRoomId}.txt`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showCustomAlert("¡Archivo .txt descargado!");
     }
 
     // ==========================================
