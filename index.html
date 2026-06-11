@@ -590,12 +590,12 @@ error: function(err) {
         if(!db) return alert("Firebase no configurado.");
         currentRoomId = document.getElementById('input-roomcode').value.trim().toUpperCase();
         if(!currentRoomId) return alert("Introduce un código.");
-        
+
         const nick = document.getElementById('input-nick').value.trim();
         const team = document.getElementById('input-team').value.trim();
 
         roomRef = db.ref('rooms/' + currentRoomId);
-        
+
         roomRef.child('users').child(myUserId).set({
             id: myUserId, 
         nick: nick,      // Ahora 'nick' sí existe
@@ -692,7 +692,7 @@ function listenToServer() {
                 document.getElementById('lottery-screen').classList.add('hidden');
                 document.getElementById('predraft-screen').classList.add('hidden');
                 document.getElementById('predraft-screen').classList.remove('flex');
-                
+
                 document.getElementById('draft-screen').classList.remove('hidden');
                 document.getElementById('draft-screen').classList.add('flex');
                 document.getElementById('pitch-container').innerHTML = getPitchHTML("slot");
@@ -726,17 +726,17 @@ function pushNews(msg) {
 
 function updateNewsTickerUI(tickerArr) {
     if(!tickerArr || tickerArr.length === 0) return;
-    
+
     const marq = document.getElementById('news-ticker');
-    
+
         // Creamos el texto de noticias (El último elemento del array es el más nuevo)
         // Lo ponemos en orden inverso para que lo más reciente salga primero
     const reversedArr = [...tickerArr].reverse();
     const newText = reversedArr.map(msg => `<span class="mx-8 font-black text-yellow-400">&bull;</span> ${msg}`).join('');
-    
+
     if (marq.innerHTML !== newText) {
         marq.innerHTML = newText;
-        
+
             // Calculamos la velocidad dinámica (30 píxeles por segundo es una velocidad de lectura cómoda)
         const textWidth = marq.offsetWidth;
         const screenWidth = window.innerWidth;
@@ -1254,11 +1254,14 @@ let _playerListOffset   = 0;
 
     // ── SCOUT PERSONAS ────────────────────────────────────────────
         const SCOUTS = [
-            { name: "Roberto Leal",   role: "Director Técnico",  icon: "fa-briefcase",  color: "text-amber-400"  },
-            { name: "Carlos Moya",    role: "Jefe de Ojeadores", icon: "fa-binoculars", color: "text-blue-400"   },
-            { name: "Iván Zubieta",   role: "Analista Táctico",  icon: "fa-chart-bar",  color: "text-green-400"  },
-            { name: "Luis Fernández", role: "Scout Europa",      icon: "fa-map",        color: "text-purple-400" },
-            { name: "Paco Jiménez",   role: "Scout de Mercado",  icon: "fa-handshake",  color: "text-cyan-400"   },
+            { name: "Oliver Gatiesa",   role: "Director Técnico",           icon: "fa-briefcase",       color: "text-amber-400"  },
+            { name: "Marisa Caletxe",   role: "Jefa de Ojeadores",          icon: "fa-binoculars",      color: "text-blue-400"   },
+            { name: "Joseba Jatangas",  role: "Analista Táctico",           icon: "fa-chart-bar",       color: "text-green-400"  },
+            { name: "Alfonso Plapollas",role: "Scout Europa",              icon: "fa-map",              color: "text-purple-400" },
+            { name: "Felipe Neduro",    role: "Scout Sudamérica",           icon: "fa-globe-americas",  color: "text-cyan-400"   },
+            { name: "Alex Tanco",       role: "Scout de Jóvenes Talentos",  icon: "fa-user-graduate",   color: "text-pink-400"   },
+            { name: "Juanma Marrico",   role: "Analista de Rendimiento",    icon: "fa-chart-line",      color: "text-red-400"    },
+            { name: "Fabio Lador",      role: "Scout de Mercado Nacional",  icon: "fa-search",          color: "text-orange-400" }
         ];
 
     // ──────────────────────────────────────────────────────────────
@@ -2160,7 +2163,7 @@ function pushDraftPickToFirebase(player, slotId, userId) {
         // En lugar de tu hora local, guardamos la hora oficial de ese último mensaje como punto de referencia
         db.ref('rooms/' + currentRoomId + '/dm/' + cid + '/seen_' + myUserId).set(
             lastMessageTs > 0 ? lastMessageTs : firebase.database.ServerValue.TIMESTAMP
-        );
+            );
     }
 
     function chatSend() {
