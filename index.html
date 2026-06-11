@@ -123,6 +123,24 @@ select option {
 </head>
 <body class="p-4 md:p-8 flex flex-col items-center min-h-screen relative">
 
+    <!-- ================================
+         SISTEMA DE AUDIO Y CONTROLES
+    ================================ -->
+    <audio id="bg-music" loop>
+        <source src="draftmusicbackground.mp4" type="audio/mp4">
+    </audio>
+    <audio id="chat-sound">
+        <source src="chatnotification.mp4" type="audio/mp4">
+    </audio>
+
+    <!-- Píldora de control flotante (Abajo a la izquierda) -->
+    <div id="audio-controls" class="fixed bottom-6 left-6 z-50 flex items-center gap-3 bg-slate-900/90 border border-white/10 px-4 py-2.5 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/30">
+        <button id="mute-btn" onclick="toggleMute()" class="text-white hover:text-blue-400 transition w-6 h-6 flex items-center justify-center">
+            <i id="mute-icon" class="fas fa-volume-up"></i>
+        </button>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.2" class="w-20 md:w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500" onchange="updateVolume(this.value)" oninput="updateVolume(this.value)">
+    </div>
+
     <!-- POPUP PERSONALIZADO DE ÉXITO -->
     <div id="custom-alert" class="fixed top-10 left-1/2 transform -translate-x-1/2 bg-green-600 border border-green-400 text-white px-6 py-3 rounded-lg shadow-[0_0_20px_rgba(34,197,94,0.6)] z-50 transition-all duration-300 opacity-0 pointer-events-none translate-y-[-20px] font-bold flex items-center gap-2">
         <i class="fas fa-check-circle"></i> <span id="custom-alert-text">Mensaje</span>
@@ -520,6 +538,59 @@ class="hidden absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-whit
         </div>
     `;
 
+    // ==========================================
+    // CONTROL DE AUDIO
+    // ==========================================
+    let bgMusic, chatSound;
+    let isMuted = false;
+    window.lastTotalUnread = 0; // Para saber cuándo hay mensajes nuevos reales
+
+    document.addEventListener("DOMContentLoaded", () => {
+        bgMusic = document.getElementById("bg-music");
+        chatSound = document.getElementById("chat-sound");
+        
+        // Volumen inicial (la música bajita, la notificación más alta)
+        bgMusic.volume = 0.2; 
+        chatSound.volume = 0.6; 
+
+        // Truco para saltarse el bloqueo de los navegadores: 
+        // La música arranca en el primer clic que haga el usuario en toda la página
+        document.body.addEventListener('click', startBgMusic, { once: true });
+    });
+
+    function startBgMusic() {
+        if (!bgMusic) return;
+        bgMusic.play().catch(e => console.log("El navegador bloqueó el autoplay aún:", e));
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        bgMusic.muted = isMuted;
+        chatSound.muted = isMuted;
+        
+        const icon = document.getElementById("mute-icon");
+        if (isMuted) {
+            icon.className = "fas fa-volume-mute text-red-500";
+        } else {
+            icon.className = "fas fa-volume-up";
+        }
+    }
+
+    function updateVolume(val) {
+        if (!bgMusic) return;
+        const volumeVal = parseFloat(val);
+        bgMusic.volume = volumeVal;
+        chatSound.volume = Math.min(1, volumeVal * 2); // Que el chat siempre suene un poco más que el fondo
+        
+        if (volumeVal > 0 && isMuted) toggleMute();
+        else if (volumeVal === 0 && !isMuted) toggleMute();
+    }
+
+    function playChatNotification() {
+        if (!chatSound || isMuted) return;
+        chatSound.currentTime = 0; // Reiniciar por si suena dos veces seguidas
+        chatSound.play().catch(e => {});
+    }
 
     function tryReconnect() {
         const saved = JSON.parse(sessionStorage.getItem('draftSession') || 'null');
@@ -2081,9 +2152,17 @@ function pushDraftPickToFirebase(player, slotId, userId) {
         const total = Object.values(_chatUnread).reduce((s,n) => s+n, 0);
         const badge = document.getElementById('chat-unread-badge');
         if (!badge) return;
+        
         badge.innerText = total;
         badge.classList.toggle('hidden', total === 0);
         badge.classList.toggle('flex', total > 0);
+        
+        // NUEVO: Reproducir sonido solo si el número total de no leídos ha subido
+        if (window.lastTotalUnread !== undefined && total > window.lastTotalUnread) {
+            playChatNotification();
+        }
+        // Guardamos el nuevo total para comparar la próxima vez
+        window.lastTotalUnread = total;
     }
 
     function toggleChatPanel() {
