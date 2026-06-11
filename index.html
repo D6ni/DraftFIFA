@@ -2090,11 +2090,22 @@ function pushDraftPickToFirebase(player, slotId, userId) {
         _chatActiveUid = uid;
         const u   = serverState.users[uid];
         const cid = _chatId(myUserId, uid);
-        document.getElementById('chat-list-view').classList.add('hidden');
+        
+        // 1. Ocultar la lista de contactos quitando también el 'flex'
+        const listView = document.getElementById('chat-list-view');
+        listView.classList.add('hidden');
+        listView.classList.remove('flex', 'flex-col'); // ¡Esta línea es la clave que faltaba!
+        
+        // 2. Mostrar la ventana de conversación
         const conv = document.getElementById('chat-conv-view');
-        conv.classList.remove('hidden'); conv.classList.add('flex');
+        conv.classList.remove('hidden'); 
+        conv.classList.add('flex');
+        
+        // 3. Rellenar datos del usuario objetivo
         document.getElementById('chat-conv-title').innerText  = u.nick;
         document.getElementById('chat-conv-avatar').innerText = u.nick.charAt(0).toUpperCase();
+        
+        // 4. Renderizar mensajes y marcar como leídos
         _renderMessages(cid);
         _markSeen(cid);
         setTimeout(() => document.getElementById('chat-input').focus(), 50);
