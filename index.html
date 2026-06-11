@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Draft FIFA PRO - Ultimate Edition</title>
+    <title>Draft FIFA | 6Ni</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -128,297 +128,297 @@ select option {
     ================================ -->
     <audio id="bg-music" loop>
         <source src="draftmusicbackground.mp4" type="audio/mp4">
-    </audio>
-    <audio id="chat-sound">
-        <source src="chatnotification.mp4" type="audio/mp4">
-    </audio>
+        </audio>
+        <audio id="chat-sound">
+            <source src="chatnotification.mp4" type="audio/mp4">
+            </audio>
 
-    <!-- Píldora de control flotante (Abajo a la izquierda) -->
-    <div id="audio-controls" class="fixed bottom-6 left-6 z-50 flex items-center gap-3 bg-slate-900/90 border border-white/10 px-4 py-2.5 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/30">
-        <button id="mute-btn" onclick="toggleMute()" class="text-white hover:text-blue-400 transition w-6 h-6 flex items-center justify-center">
-            <i id="mute-icon" class="fas fa-volume-up"></i>
-        </button>
-        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.2" class="w-20 md:w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500" onchange="updateVolume(this.value)" oninput="updateVolume(this.value)">
-    </div>
-
-    <!-- POPUP PERSONALIZADO DE ÉXITO -->
-    <div id="custom-alert" class="fixed top-10 left-1/2 transform -translate-x-1/2 bg-green-600 border border-green-400 text-white px-6 py-3 rounded-lg shadow-[0_0_20px_rgba(34,197,94,0.6)] z-50 transition-all duration-300 opacity-0 pointer-events-none translate-y-[-20px] font-bold flex items-center gap-2">
-        <i class="fas fa-check-circle"></i> <span id="custom-alert-text">Mensaje</span>
-    </div>
-
-    <!-- NEWS TICKER (TOP) -->
-    <div id="news-ticker-container" class="hidden w-full max-w-7xl bg-black/60 border border-white/10 rounded-lg mb-4 flex overflow-hidden shadow-lg relative z-10">
-        <div class="bg-blue-600 text-white font-black px-4 py-2 z-20 flex-shrink-0 flex items-center shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
-            <i class="fas fa-bolt mr-2 text-yellow-400"></i> EN VIVO
-        </div>
-        <div class="flex-1 overflow-hidden relative flex items-center">
-            <div id="news-ticker" class="animate-ticker text-gray-300 font-semibold tracking-wide">
-                Bienvenidos al Draft. Preparando estadísticas...
+            <!-- Píldora de control flotante (Abajo a la izquierda) -->
+            <div id="audio-controls" class="fixed bottom-6 left-6 z-50 flex items-center gap-3 bg-slate-900/90 border border-white/10 px-4 py-2.5 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/30">
+                <button id="mute-btn" onclick="toggleMute()" class="text-white hover:text-blue-400 transition w-6 h-6 flex items-center justify-center">
+                    <i id="mute-icon" class="fas fa-volume-up"></i>
+                </button>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.2" class="w-20 md:w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500" onchange="updateVolume(this.value)" oninput="updateVolume(this.value)">
             </div>
-        </div>
-    </div>
 
-    <!-- 1. PANTALLA DE CONFIGURACIÓN -->
-    <div id="step1-screen" class="glass p-10 max-w-md w-full text-center relative z-10 mt-10">
-        <h1 class="text-4xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">DRAFT ONLINE</h1>
-        <p class="text-gray-400 mb-6">Prepara tus datos para conectar</p>
-
-        <!-- Nuevo recuadro de Auto-Carga -->
-        <div class="mb-6 text-center bg-black/30 p-4 rounded-lg border border-white/10">
-            <i class="fas fa-database text-blue-400 text-3xl mb-3 animate-pulse"></i>
-            <div id="csv-status" class="text-sm text-yellow-400 font-mono">Conectando con db.csv...</div>
-        </div>
-
-        <input type="text" id="input-nick" placeholder="Tu Nickname (Ej: Marcos)" class="w-full mb-4 p-3 bg-white/5 border border-white/10 rounded outline-none focus:border-blue-500 text-white">
-        <input type="text" id="input-team" placeholder="Nombre de tu Equipo (Ej: FC Pacos)" class="w-full mb-8 p-3 bg-white/5 border border-white/10 rounded outline-none focus:border-blue-500 text-white">
-        
-        <button id="btn-next" onclick="goToLobbyChoice()" disabled class="w-full glass-button text-white font-bold py-3 rounded-lg flex justify-center items-center gap-2">
-            Continuar <i class="fas fa-arrow-right"></i>
-        </button>
-    </div>
-
-    <!-- 2. SELECCIÓN DE SALA -->
-    <div id="step2-screen" class="hidden glass p-10 max-w-md w-full text-center relative z-10 mt-10">
-        <h2 class="text-2xl font-bold mb-6">Lobby Multijugador</h2>
-        <button onclick="createRoom()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mb-4 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
-            <i class="fas fa-plus-circle"></i> Crear Nueva Sala
-        </button>
-        <div class="flex items-center gap-4 my-4">
-            <div class="h-px bg-white/20 flex-1"></div><span class="text-gray-400 text-sm">O</span><div class="h-px bg-white/20 flex-1"></div>
-        </div>
-        <input type="text" id="input-roomcode" placeholder="Código de la sala" class="w-full mb-4 p-3 bg-white/5 border border-white/10 rounded outline-none focus:border-blue-500 text-center text-xl font-mono uppercase text-white">
-        <button onclick="joinRoom()" class="w-full glass-button text-white font-bold py-3 rounded-lg">
-            <i class="fas fa-sign-in-alt"></i> Unirse a la Sala
-        </button>
-    </div>
-
-    <!-- 3. LOBBY ESPERA -->
-    <div id="lobby-screen" class="hidden glass p-10 max-w-xl w-full text-center relative z-10 mt-10">
-        <h2 class="text-3xl font-bold mb-2">Sala: <span id="lobby-code-display" class="text-blue-400 tracking-widest font-mono">ABCD</span></h2>
-        <p class="text-gray-400 mb-6">Esperando a que entren tus amigos...</p>
-
-        <button onclick="copyInviteLink()" class="mb-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded border border-white/20 text-sm transition">
-            <i class="fas fa-link text-blue-400"></i> Copiar enlace de invitación
-        </button>
-
-        <div class="bg-black/40 rounded-lg border border-white/10 p-4 mb-6 min-h-[200px]">
-            <h3 class="text-left font-bold text-sm text-gray-400 mb-3 uppercase">Jugadores Unidos (<span id="lobby-count">1</span>)</h3>
-            <ul id="lobby-players-list" class="flex flex-col gap-2 text-left"></ul>
-        </div>
-
-        <div id="host-controls" class="hidden flex flex-col gap-3">
-            <button onclick="addBot()" class="w-full glass-button text-white py-2 rounded-lg text-sm border-yellow-500/50 hover:bg-yellow-500/20">
-                <i class="fas fa-robot text-yellow-500"></i> Añadir Bot (Opcional)
-            </button>
-            <button onclick="startOnlineDraft()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.5)]">
-                <i class="fas fa-random"></i> Sortear Orden
-            </button>
-        </div>
-        <div id="guest-controls" class="text-yellow-400 animate-pulse text-sm">
-            Esperando a que el Host sortee el orden...
-        </div>
-    </div>
-
-    <!-- 4. SORTEO ANIMADO -->
-    <div id="lottery-screen" class="hidden w-full min-h-screen fixed top-0 left-0 bg-slate-900/95 z-50 flex-col items-center justify-center p-4">
-        <h1 class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-8 tracking-widest uppercase drop-shadow-lg">Sorteo del Draft</h1>
-        <div class="glass p-10 text-center w-full max-w-3xl flex flex-col justify-center items-center relative overflow-hidden" style="min-height: 350px;">
-            <div id="lottery-msg" class="text-2xl md:text-3xl text-gray-300 font-bold mb-6 transition-all duration-300">Mezclando equipos...</div>
-            <div id="lottery-reveal" class="text-5xl md:text-7xl font-black text-white scale-0 transition-transform duration-500 drop-shadow-[0_0_20px_rgba(255,255,255,0.5)]"></div>
-            <div id="lottery-top2" class="hidden w-full justify-around items-center mt-6">
-                <div id="top2-left" class="glass p-6 text-2xl md:text-4xl font-black w-[40%] text-center transition-all duration-300 break-words"></div>
-                <div class="text-4xl md:text-6xl font-black text-red-500 px-4 animate-pulse">VS</div>
-                <div id="top2-right" class="glass p-6 text-2xl md:text-4xl font-black w-[40%] text-center transition-all duration-300 break-words"></div>
+            <!-- POPUP PERSONALIZADO DE ÉXITO -->
+            <div id="custom-alert" class="fixed top-10 left-1/2 transform -translate-x-1/2 bg-green-600 border border-green-400 text-white px-6 py-3 rounded-lg shadow-[0_0_20px_rgba(34,197,94,0.6)] z-50 transition-all duration-300 opacity-0 pointer-events-none translate-y-[-20px] font-bold flex items-center gap-2">
+                <i class="fas fa-check-circle"></i> <span id="custom-alert-text">Mensaje</span>
             </div>
-        </div>
-        <div class="mt-10 w-full max-w-3xl">
-            <h3 class="text-center text-gray-400 font-bold mb-4 uppercase tracking-widest">Orden de Selección</h3>
-            <div id="lottery-results" class="flex flex-col-reverse gap-2"></div>
-        </div>
-    </div>
 
-    <!-- 5. PRE-DRAFT (TRADES) -->
-    <div id="predraft-screen" class="hidden w-full max-w-7xl flex-col gap-4 relative z-10">
-        <div class="glass p-6 text-center">
-            <h2 class="text-3xl font-black text-blue-400 mb-2">FASE DE PRE-DRAFT</h2>
-            <p class="text-gray-300 mb-1">Revisa el orden y negocia intercambios de picks con otros mánagers.</p>
-            <p class="text-xs text-gray-500 mb-6"><i class="fas fa-hand-pointer text-blue-400 mr-1"></i>Haz clic en <span class="text-blue-300 font-bold">tus picks</span> para marcarlos como oferta · Haz clic en los picks de <span class="text-white font-bold">un rival</span> para proponer un intercambio</p>
-            
-            <!-- Status bar de picks seleccionados -->
-            <div id="predraft-status-bar" class="hidden mb-4 bg-black/50 border border-yellow-500/50 rounded-lg p-3 flex flex-wrap gap-3 items-center justify-between">
-                <div class="flex gap-4 items-center">
-                    <div><span class="text-xs text-yellow-400 font-bold uppercase mr-2">DAS:</span><span id="status-give" class="text-white font-bold">-</span></div>
-                    <div class="text-gray-500">⇄</div>
-                    <div><span class="text-xs text-green-400 font-bold uppercase mr-2">RECIBES:</span><span id="status-get" class="text-white font-bold">-</span></div>
+            <!-- NEWS TICKER (TOP) -->
+            <div id="news-ticker-container" class="hidden w-full max-w-7xl bg-black/60 border border-white/10 rounded-lg mb-4 flex overflow-hidden shadow-lg relative z-10">
+                <div class="bg-blue-600 text-white font-black px-4 py-2 z-20 flex-shrink-0 flex items-center shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+                    <i class="fas fa-bolt mr-2 text-yellow-400"></i> EN VIVO
                 </div>
-                <button onclick="clearTradeSelection()" class="text-xs text-red-400 underline hover:text-red-300">Limpiar selección</button>
-            </div>
-
-            <div class="bg-black/40 p-4 rounded-lg border border-white/10 mb-6 text-left" id="predraft-board">
-                <!-- Se rellena con el board completo -->
-            </div>
-
-            <!-- Panel de Trades -->
-            <div id="trade-panel" class="bg-indigo-900/30 border border-indigo-500/50 p-4 rounded-lg text-left hidden mb-6">
-                <h3 class="font-bold text-indigo-300 mb-2">Proponer Intercambio a <span id="trade-target-name" class="text-white"></span></h3>
-                <div class="flex gap-4">
-                    <div class="flex-1">
-                        <label class="text-xs text-gray-400 mb-1 block">Picks que DAS (Tuyos):</label>
-                        <div id="trade-give" class="w-full bg-black/50 p-2 rounded h-32 overflow-y-auto border border-white/20 flex flex-col gap-1"></div>
-                    </div>
-                    <div class="flex-1">
-                        <label class="text-xs text-gray-400 mb-1 block">Picks que RECIBES (Suyos):</label>
-                        <div id="trade-get" class="w-full bg-black/50 p-2 rounded h-32 overflow-y-auto border border-white/20 flex flex-col gap-1"></div>
+                <div class="flex-1 overflow-hidden relative flex items-center">
+                    <div id="news-ticker" class="animate-ticker text-gray-300 font-semibold tracking-wide">
+                        Bienvenidos al Draft. Preparando estadísticas...
                     </div>
                 </div>
-                <button onclick="sendTradeOffer()" class="mt-3 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded text-sm font-bold shadow-lg">Enviar Oferta</button>
             </div>
 
-            <!-- Ofertas recibidas -->
-            <div id="incoming-trades" class="flex flex-col gap-2 mb-6"></div>
+            <!-- 1. PANTALLA DE CONFIGURACIÓN -->
+            <div id="step1-screen" class="glass p-10 max-w-md w-full text-center relative z-10 mt-10">
+                <h1 class="text-4xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">DRAFT ONLINE</h1>
+                <p class="text-gray-400 mb-6">Prepara tus datos para conectar</p>
 
-            <div id="predraft-host-controls" class="hidden">
-                <button onclick="endPreDraft()" class="bg-green-600 hover:bg-green-500 text-white font-bold px-8 py-3 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.5)]">
-                    <i class="fas fa-gavel"></i> Finalizar Pre-Draft y Empezar
+                <!-- Nuevo recuadro de Auto-Carga -->
+                <div class="mb-6 text-center bg-black/30 p-4 rounded-lg border border-white/10">
+                    <i class="fas fa-database text-blue-400 text-3xl mb-3 animate-pulse"></i>
+                    <div id="csv-status" class="text-sm text-yellow-400 font-mono">Conectando con db.csv...</div>
+                </div>
+
+                <input type="text" id="input-nick" placeholder="Tu Nickname (Ej: Marcos)" class="w-full mb-4 p-3 bg-white/5 border border-white/10 rounded outline-none focus:border-blue-500 text-white">
+                <input type="text" id="input-team" placeholder="Nombre de tu Equipo (Ej: FC Pacos)" class="w-full mb-8 p-3 bg-white/5 border border-white/10 rounded outline-none focus:border-blue-500 text-white">
+
+                <button id="btn-next" onclick="goToLobbyChoice()" disabled class="w-full glass-button text-white font-bold py-3 rounded-lg flex justify-center items-center gap-2">
+                    Continuar <i class="fas fa-arrow-right"></i>
                 </button>
             </div>
-            <div id="predraft-guest-controls" class="text-yellow-400 animate-pulse text-sm">
-                Esperando a que el Host inicie el draft oficial...
-            </div>
-        </div>
-    </div>
 
-    <!-- 6. PANTALLA PRINCIPAL DEL DRAFT -->
-    <div id="draft-screen" class="hidden w-full max-w-7xl flex-col gap-4 relative z-10">
-        <!-- Tracker de Picks -->
-        <div class="w-full bg-black/50 border border-white/10 rounded-lg p-2 flex overflow-x-auto gap-2 items-center" id="draft-tracker"></div>
-
-        <div id="draft-header" class="glass p-4 flex flex-col md:flex-row justify-between items-center transition-all">
-            <div class="flex items-center gap-4 mb-4 md:mb-0 flex-wrap">
-                <div class="text-sm text-gray-400">Pick Global <span id="round-indicator" class="text-white font-bold text-lg">1</span></div>
-                <div class="h-8 w-px bg-white/20 hidden md:block"></div>
-                <div>Turno de: <span id="current-turn-name" class="font-bold text-xl text-blue-400">...</span></div>
-                <div class="h-8 w-px bg-white/20 hidden md:block"></div>
-                <div id="picks-until-turn-badge" class="hidden text-xs font-bold px-2 py-1 rounded-full bg-white/10 border border-white/20"></div>
-            </div>
-            <div class="flex items-center gap-6">
-                <div class="text-center hidden md:block">
-                    <div class="text-xs text-gray-400 uppercase tracking-widest">Media Equipo</div>
-                    <div id="my-avg-ovr" class="text-2xl font-mono font-bold text-purple-400">-</div>
+            <!-- 2. SELECCIÓN DE SALA -->
+            <div id="step2-screen" class="hidden glass p-10 max-w-md w-full text-center relative z-10 mt-10">
+                <h2 class="text-2xl font-bold mb-6">Lobby Multijugador</h2>
+                <button onclick="createRoom()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mb-4 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+                    <i class="fas fa-plus-circle"></i> Crear Nueva Sala
+                </button>
+                <div class="flex items-center gap-4 my-4">
+                    <div class="h-px bg-white/20 flex-1"></div><span class="text-gray-400 text-sm">O</span><div class="h-px bg-white/20 flex-1"></div>
                 </div>
-                <div class="text-center">
-                    <div class="text-xs text-gray-400 uppercase tracking-widest">Tiempo</div>
-                    <div id="timer" class="text-4xl font-mono font-bold text-green-400">05:00</div>
-                </div>
+                <input type="text" id="input-roomcode" placeholder="Código de la sala" class="w-full mb-4 p-3 bg-white/5 border border-white/10 rounded outline-none focus:border-blue-500 text-center text-xl font-mono uppercase text-white">
+                <button onclick="joinRoom()" class="w-full glass-button text-white font-bold py-3 rounded-lg">
+                    <i class="fas fa-sign-in-alt"></i> Unirse a la Sala
+                </button>
             </div>
-        </div>
 
-        <div id="jumbotron" class="glass w-full p-6 text-center hidden relative overflow-hidden transition-all duration-500">
-            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 animate-pulse"></div>
-            <div id="jumbo-grade" class="grade-stamp hidden">A+</div>
-            
-            <div class="relative z-10 text-xl font-extrabold uppercase text-white">Pick <span id="jumbo-pick" class="text-blue-400">#1</span></div>
-            <div class="relative z-10 text-lg mt-1 text-gray-300"><span id="jumbo-team" class="font-bold text-blue-300">Equipo</span> selecciona a...</div>
-            <div class="relative z-10 flex flex-col md:flex-row justify-center items-center gap-4 mt-4 h-[60px]">
-                <div id="jumbo-rat-container" class="hidden"><span id="jumbo-rat" class="text-white text-3xl font-black bg-black/80 px-4 py-2 rounded-lg border-2 border-yellow-500">99</span></div>
-                <div id="jumbo-player" class="text-3xl md:text-5xl font-black"></div>
-            </div>
-            <div id="jumbo-pos" class="relative z-10 text-lg font-bold text-blue-300 mt-4 opacity-0 transition-opacity">en la posición de <span id="jumbo-pos-text" class="text-white underline">MC</span></div>
-        </div>
+            <!-- 3. LOBBY ESPERA -->
+            <div id="lobby-screen" class="hidden glass p-10 max-w-xl w-full text-center relative z-10 mt-10">
+                <h2 class="text-3xl font-bold mb-2">Sala: <span id="lobby-code-display" class="text-blue-400 tracking-widest font-mono">ABCD</span></h2>
+                <p class="text-gray-400 mb-6">Esperando a que entren tus amigos...</p>
 
-        <div class="flex flex-col lg:flex-row gap-6 h-[720px]" id="play-area">
-            <div class="w-full lg:w-7/12 flex flex-col gap-3">
-                <div class="glass p-2 flex gap-2 overflow-x-auto" id="team-tabs"></div>
-                
-                <!-- Banners de Confirmación -->
-                <div id="placement-banner" class="hidden bg-black/60 border border-yellow-500 p-3 text-center rounded-lg shadow-lg relative z-20">
-                    <div class="text-gray-200 text-sm mb-1">Selecciona posición para <b class="text-yellow-400" id="placement-name"></b></div>
-                    <div id="placement-hint" class="text-[10px] text-purple-300 mb-2"><i class="fas fa-map-marker-alt mr-1"></i>Posiciones compatibles resaltadas en <span class="font-bold text-purple-300">morado</span></div>
-                    <button id="btn-cancel-pick" onclick="cancelPlacement()" class="text-xs text-red-400 underline">Cancelar</button>
+                <button onclick="copyInviteLink()" class="mb-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded border border-white/20 text-sm transition">
+                    <i class="fas fa-link text-blue-400"></i> Copiar enlace de invitación
+                </button>
+
+                <div class="bg-black/40 rounded-lg border border-white/10 p-4 mb-6 min-h-[200px]">
+                    <h3 class="text-left font-bold text-sm text-gray-400 mb-3 uppercase">Jugadores Unidos (<span id="lobby-count">1</span>)</h3>
+                    <ul id="lobby-players-list" class="flex flex-col gap-2 text-left"></ul>
                 </div>
 
-                <div id="confirm-banner" class="hidden bg-green-900/80 border border-green-500 p-3 text-center rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.4)] relative z-20">
-                    <div class="text-white text-sm mb-2">Confirmar <b id="confirm-name"></b> en <b id="confirm-pos" class="text-yellow-300"></b></div>
-                    <button id="btn-confirm-pick" class="bg-green-500 hover:bg-green-400 text-white font-black px-6 py-2 rounded shadow">CONFIRMAR PICK</button>
-                </div>
-
-                <div class="glass flex-1 flex flex-col p-4" id="pitch-container"></div>
-            </div>
-
-            <div class="w-full lg:w-5/12 glass flex flex-col overflow-hidden">
-                <!-- Pestañas Agencia vs War Room -->
-                <div class="flex border-b border-white/10 bg-black/40">
-                    <button onclick="switchRightTab('agencia')" id="tab-agencia" class="flex-1 py-3 font-bold text-blue-400 border-b-2 border-blue-400">Agencia Libre</button>
-                    <button onclick="switchRightTab('warroom')" id="tab-warroom" class="flex-1 py-3 font-bold text-gray-400 hover:text-white transition"><i class="fas fa-clipboard-list text-amber-400 mr-1"></i> Scouting</button>
-                    <button onclick="switchRightTab('trades')" id="tab-trades" class="flex-1 py-3 font-bold text-gray-400 hover:text-white transition relative">
-                        <i class="fas fa-exchange-alt text-green-400 mr-1"></i> Trades
-                        <span id="trades-tab-badge" class="hidden absolute top-1.5 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-black">0</span>
+                <div id="host-controls" class="hidden flex flex-col gap-3">
+                    <button onclick="addBot()" class="w-full glass-button text-white py-2 rounded-lg text-sm border-yellow-500/50 hover:bg-yellow-500/20">
+                        <i class="fas fa-robot text-yellow-500"></i> Añadir Bot (Opcional)
+                    </button>
+                    <button onclick="startOnlineDraft()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.5)]">
+                        <i class="fas fa-random"></i> Sortear Orden
                     </button>
                 </div>
-
-                <!-- Tab: Agencia Libre -->
-                <div id="panel-agencia" class="flex flex-col flex-1 overflow-hidden">
-                    <div class="p-4 border-b border-white/10 bg-black/20">
-                        <div class="flex gap-2 mb-3">
-                            <input type="text" id="search-input" placeholder="Buscar jugador..." class="flex-1 p-2 bg-white/5 border border-white/10 rounded text-sm text-white outline-none">
-                            <select id="sort-filter" class="p-2 bg-black/60 border border-white/20 rounded text-xs text-white outline-none focus:border-blue-500 hover:border-white/40 cursor-pointer shadow-lg transition-all" onchange="renderPlayers()">
-                                <option value="rat" style="background: #0f172a; color: white;">🏆 OVR (Media)</option>
-                                <option value="pac" style="background: #0f172a; color: white;">⚡ PAC (Ritmo)</option>
-                                <option value="sho" style="background: #0f172a; color: white;">🎯 SHO (Tiro)</option>
-                                <option value="pas" style="background: #0f172a; color: white;">👟 PAS (Pase)</option>
-                                <option value="dri" style="background: #0f172a; color: white;">🔮 DRI (Regate)</option>
-                                <option value="def" style="background: #0f172a; color: white;">🛡️ DEF (Defensa)</option>
-                            </select>
-                        </div>
-                        <div class="flex flex-wrap gap-1.5" id="pos-filter-container">
-                            <div class="pos-pill" onclick="togglePosFilter('GK')">GK</div>
-                            <div class="pos-pill" onclick="togglePosFilter('CB')">CB</div>
-                            <div class="pos-pill" onclick="togglePosFilter('LB')">LB</div>
-                            <div class="pos-pill" onclick="togglePosFilter('RB')">RB</div>
-                            <div class="pos-pill" onclick="togglePosFilter('CDM')">CDM</div>
-                            <div class="pos-pill" onclick="togglePosFilter('CM')">CM</div>
-                            <div class="pos-pill" onclick="togglePosFilter('CAM')">CAM</div>
-                            <div class="pos-pill" onclick="togglePosFilter('ST')">ST</div>
-                            <div class="pos-pill" onclick="togglePosFilter('LW')">LW</div>
-                            <div class="pos-pill" onclick="togglePosFilter('RW')">RW</div>
-                            <div class="pos-pill !bg-red-500/20" onclick="clearPosFilters()">Reset</div>
-                        </div>
-                    </div>
-                    <div id="players-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2 relative"></div>
-                </div>
-
-                <!-- Tab: Trades -->
-                <div id="panel-trades" class="hidden flex-col flex-1 overflow-y-auto p-4 gap-2" style="background:rgba(2,6,15,0.4)">
-                    <div id="trades-content"></div>
-                </div>
-
-                <!-- Tab: War Room -->
-                <div id="panel-warroom" class="hidden flex flex-col flex-1 overflow-y-auto p-4 bg-slate-900/50">
-                    <div class="flex items-center justify-between mb-3">
-                        <div>
-                            <h3 class="text-amber-400 font-bold uppercase tracking-widest text-sm"><i class="fas fa-clipboard-list mr-2"></i>Dpto. de Scouting</h3>
-                            <p class="text-[10px] text-gray-500 mt-0.5">Informes confidenciales de tu equipo técnico</p>
-                        </div>
-                        <div id="picks-turn-counter" class="text-xs px-2 py-1 rounded-full font-bold bg-black/40 border border-white/10"></div>
-                    </div>
-                    <div id="team-needs-summary" class="bg-black/30 border border-white/10 rounded-lg p-2 mb-3 text-xs text-gray-300"></div>
-                    <div id="advisor-recommendations" class="flex flex-col gap-2"></div>
+                <div id="guest-controls" class="text-yellow-400 animate-pulse text-sm">
+                    Esperando a que el Host sortee el orden...
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- 7. PANTALLA FINAL (GALARDONES) -->
-    <div id="end-screen" class="hidden w-full max-w-7xl flex-col gap-6 relative z-10 py-10">
-        <h1 class="text-4xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-2">RESULTADOS DEL DRAFT</h1>
-        
-        <div class="glass p-6 mb-4">
-            <h2 class="text-2xl font-bold text-center mb-6 uppercase tracking-widest text-gray-300">Premios de la Temporada</h2>
-            <div id="awards-container" class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center"></div>
-        </div>
+            <!-- 4. SORTEO ANIMADO -->
+            <div id="lottery-screen" class="hidden w-full min-h-screen fixed top-0 left-0 bg-slate-900/95 z-50 flex-col items-center justify-center p-4">
+                <h1 class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-8 tracking-widest uppercase drop-shadow-lg">Sorteo del Draft</h1>
+                <div class="glass p-10 text-center w-full max-w-3xl flex flex-col justify-center items-center relative overflow-hidden" style="min-height: 350px;">
+                    <div id="lottery-msg" class="text-2xl md:text-3xl text-gray-300 font-bold mb-6 transition-all duration-300">Mezclando equipos...</div>
+                    <div id="lottery-reveal" class="text-5xl md:text-7xl font-black text-white scale-0 transition-transform duration-500 drop-shadow-[0_0_20px_rgba(255,255,255,0.5)]"></div>
+                    <div id="lottery-top2" class="hidden w-full justify-around items-center mt-6">
+                        <div id="top2-left" class="glass p-6 text-2xl md:text-4xl font-black w-[40%] text-center transition-all duration-300 break-words"></div>
+                        <div class="text-4xl md:text-6xl font-black text-red-500 px-4 animate-pulse">VS</div>
+                        <div id="top2-right" class="glass p-6 text-2xl md:text-4xl font-black w-[40%] text-center transition-all duration-300 break-words"></div>
+                    </div>
+                </div>
+                <div class="mt-10 w-full max-w-3xl">
+                    <h3 class="text-center text-gray-400 font-bold mb-4 uppercase tracking-widest">Orden de Selección</h3>
+                    <div id="lottery-results" class="flex flex-col-reverse gap-2"></div>
+                </div>
+            </div>
 
-        <div id="final-pitches-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full"></div>
-    </div>
+            <!-- 5. PRE-DRAFT (TRADES) -->
+            <div id="predraft-screen" class="hidden w-full max-w-7xl flex-col gap-4 relative z-10">
+                <div class="glass p-6 text-center">
+                    <h2 class="text-3xl font-black text-blue-400 mb-2">FASE DE PRE-DRAFT</h2>
+                    <p class="text-gray-300 mb-1">Revisa el orden y negocia intercambios de picks con otros mánagers.</p>
+                    <p class="text-xs text-gray-500 mb-6"><i class="fas fa-hand-pointer text-blue-400 mr-1"></i>Haz clic en <span class="text-blue-300 font-bold">tus picks</span> para marcarlos como oferta · Haz clic en los picks de <span class="text-white font-bold">un rival</span> para proponer un intercambio</p>
+
+                    <!-- Status bar de picks seleccionados -->
+                    <div id="predraft-status-bar" class="hidden mb-4 bg-black/50 border border-yellow-500/50 rounded-lg p-3 flex flex-wrap gap-3 items-center justify-between">
+                        <div class="flex gap-4 items-center">
+                            <div><span class="text-xs text-yellow-400 font-bold uppercase mr-2">DAS:</span><span id="status-give" class="text-white font-bold">-</span></div>
+                            <div class="text-gray-500">⇄</div>
+                            <div><span class="text-xs text-green-400 font-bold uppercase mr-2">RECIBES:</span><span id="status-get" class="text-white font-bold">-</span></div>
+                        </div>
+                        <button onclick="clearTradeSelection()" class="text-xs text-red-400 underline hover:text-red-300">Limpiar selección</button>
+                    </div>
+
+                    <div class="bg-black/40 p-4 rounded-lg border border-white/10 mb-6 text-left" id="predraft-board">
+                        <!-- Se rellena con el board completo -->
+                    </div>
+
+                    <!-- Panel de Trades -->
+                    <div id="trade-panel" class="bg-indigo-900/30 border border-indigo-500/50 p-4 rounded-lg text-left hidden mb-6">
+                        <h3 class="font-bold text-indigo-300 mb-2">Proponer Intercambio a <span id="trade-target-name" class="text-white"></span></h3>
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <label class="text-xs text-gray-400 mb-1 block">Picks que DAS (Tuyos):</label>
+                                <div id="trade-give" class="w-full bg-black/50 p-2 rounded h-32 overflow-y-auto border border-white/20 flex flex-col gap-1"></div>
+                            </div>
+                            <div class="flex-1">
+                                <label class="text-xs text-gray-400 mb-1 block">Picks que RECIBES (Suyos):</label>
+                                <div id="trade-get" class="w-full bg-black/50 p-2 rounded h-32 overflow-y-auto border border-white/20 flex flex-col gap-1"></div>
+                            </div>
+                        </div>
+                        <button onclick="sendTradeOffer()" class="mt-3 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded text-sm font-bold shadow-lg">Enviar Oferta</button>
+                    </div>
+
+                    <!-- Ofertas recibidas -->
+                    <div id="incoming-trades" class="flex flex-col gap-2 mb-6"></div>
+
+                    <div id="predraft-host-controls" class="hidden">
+                        <button onclick="endPreDraft()" class="bg-green-600 hover:bg-green-500 text-white font-bold px-8 py-3 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.5)]">
+                            <i class="fas fa-gavel"></i> Finalizar Pre-Draft y Empezar
+                        </button>
+                    </div>
+                    <div id="predraft-guest-controls" class="text-yellow-400 animate-pulse text-sm">
+                        Esperando a que el Host inicie el draft oficial...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. PANTALLA PRINCIPAL DEL DRAFT -->
+            <div id="draft-screen" class="hidden w-full max-w-7xl flex-col gap-4 relative z-10">
+                <!-- Tracker de Picks -->
+                <div class="w-full bg-black/50 border border-white/10 rounded-lg p-2 flex overflow-x-auto gap-2 items-center" id="draft-tracker"></div>
+
+                <div id="draft-header" class="glass p-4 flex flex-col md:flex-row justify-between items-center transition-all">
+                    <div class="flex items-center gap-4 mb-4 md:mb-0 flex-wrap">
+                        <div class="text-sm text-gray-400">Pick Global <span id="round-indicator" class="text-white font-bold text-lg">1</span></div>
+                        <div class="h-8 w-px bg-white/20 hidden md:block"></div>
+                        <div>Turno de: <span id="current-turn-name" class="font-bold text-xl text-blue-400">...</span></div>
+                        <div class="h-8 w-px bg-white/20 hidden md:block"></div>
+                        <div id="picks-until-turn-badge" class="hidden text-xs font-bold px-2 py-1 rounded-full bg-white/10 border border-white/20"></div>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <div class="text-center hidden md:block">
+                            <div class="text-xs text-gray-400 uppercase tracking-widest">Media Equipo</div>
+                            <div id="my-avg-ovr" class="text-2xl font-mono font-bold text-purple-400">-</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-gray-400 uppercase tracking-widest">Tiempo</div>
+                            <div id="timer" class="text-4xl font-mono font-bold text-green-400">05:00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="jumbotron" class="glass w-full p-6 text-center hidden relative overflow-hidden transition-all duration-500">
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 animate-pulse"></div>
+                    <div id="jumbo-grade" class="grade-stamp hidden">A+</div>
+
+                    <div class="relative z-10 text-xl font-extrabold uppercase text-white">Pick <span id="jumbo-pick" class="text-blue-400">#1</span></div>
+                    <div class="relative z-10 text-lg mt-1 text-gray-300"><span id="jumbo-team" class="font-bold text-blue-300">Equipo</span> selecciona a...</div>
+                    <div class="relative z-10 flex flex-col md:flex-row justify-center items-center gap-4 mt-4 h-[60px]">
+                        <div id="jumbo-rat-container" class="hidden"><span id="jumbo-rat" class="text-white text-3xl font-black bg-black/80 px-4 py-2 rounded-lg border-2 border-yellow-500">99</span></div>
+                        <div id="jumbo-player" class="text-3xl md:text-5xl font-black"></div>
+                    </div>
+                    <div id="jumbo-pos" class="relative z-10 text-lg font-bold text-blue-300 mt-4 opacity-0 transition-opacity">en la posición de <span id="jumbo-pos-text" class="text-white underline">MC</span></div>
+                </div>
+
+                <div class="flex flex-col lg:flex-row gap-6 h-[720px]" id="play-area">
+                    <div class="w-full lg:w-7/12 flex flex-col gap-3">
+                        <div class="glass p-2 flex gap-2 overflow-x-auto" id="team-tabs"></div>
+
+                        <!-- Banners de Confirmación -->
+                        <div id="placement-banner" class="hidden bg-black/60 border border-yellow-500 p-3 text-center rounded-lg shadow-lg relative z-20">
+                            <div class="text-gray-200 text-sm mb-1">Selecciona posición para <b class="text-yellow-400" id="placement-name"></b></div>
+                            <div id="placement-hint" class="text-[10px] text-purple-300 mb-2"><i class="fas fa-map-marker-alt mr-1"></i>Posiciones compatibles resaltadas en <span class="font-bold text-purple-300">morado</span></div>
+                            <button id="btn-cancel-pick" onclick="cancelPlacement()" class="text-xs text-red-400 underline">Cancelar</button>
+                        </div>
+
+                        <div id="confirm-banner" class="hidden bg-green-900/80 border border-green-500 p-3 text-center rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.4)] relative z-20">
+                            <div class="text-white text-sm mb-2">Confirmar <b id="confirm-name"></b> en <b id="confirm-pos" class="text-yellow-300"></b></div>
+                            <button id="btn-confirm-pick" class="bg-green-500 hover:bg-green-400 text-white font-black px-6 py-2 rounded shadow">CONFIRMAR PICK</button>
+                        </div>
+
+                        <div class="glass flex-1 flex flex-col p-4" id="pitch-container"></div>
+                    </div>
+
+                    <div class="w-full lg:w-5/12 glass flex flex-col overflow-hidden">
+                        <!-- Pestañas Agencia vs War Room -->
+                        <div class="flex border-b border-white/10 bg-black/40">
+                            <button onclick="switchRightTab('agencia')" id="tab-agencia" class="flex-1 py-3 font-bold text-blue-400 border-b-2 border-blue-400">Agencia Libre</button>
+                            <button onclick="switchRightTab('warroom')" id="tab-warroom" class="flex-1 py-3 font-bold text-gray-400 hover:text-white transition"><i class="fas fa-clipboard-list text-amber-400 mr-1"></i> Scouting</button>
+                            <button onclick="switchRightTab('trades')" id="tab-trades" class="flex-1 py-3 font-bold text-gray-400 hover:text-white transition relative">
+                                <i class="fas fa-exchange-alt text-green-400 mr-1"></i> Trades
+                                <span id="trades-tab-badge" class="hidden absolute top-1.5 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-black">0</span>
+                            </button>
+                        </div>
+
+                        <!-- Tab: Agencia Libre -->
+                        <div id="panel-agencia" class="flex flex-col flex-1 overflow-hidden">
+                            <div class="p-4 border-b border-white/10 bg-black/20">
+                                <div class="flex gap-2 mb-3">
+                                    <input type="text" id="search-input" placeholder="Buscar jugador..." class="flex-1 p-2 bg-white/5 border border-white/10 rounded text-sm text-white outline-none">
+                                    <select id="sort-filter" class="p-2 bg-black/60 border border-white/20 rounded text-xs text-white outline-none focus:border-blue-500 hover:border-white/40 cursor-pointer shadow-lg transition-all" onchange="renderPlayers()">
+                                        <option value="rat" style="background: #0f172a; color: white;">🏆 OVR (Media)</option>
+                                        <option value="pac" style="background: #0f172a; color: white;">⚡ PAC (Ritmo)</option>
+                                        <option value="sho" style="background: #0f172a; color: white;">🎯 SHO (Tiro)</option>
+                                        <option value="pas" style="background: #0f172a; color: white;">👟 PAS (Pase)</option>
+                                        <option value="dri" style="background: #0f172a; color: white;">🔮 DRI (Regate)</option>
+                                        <option value="def" style="background: #0f172a; color: white;">🛡️ DEF (Defensa)</option>
+                                    </select>
+                                </div>
+                                <div class="flex flex-wrap gap-1.5" id="pos-filter-container">
+                                    <div class="pos-pill" onclick="togglePosFilter('GK')">GK</div>
+                                    <div class="pos-pill" onclick="togglePosFilter('CB')">CB</div>
+                                    <div class="pos-pill" onclick="togglePosFilter('LB')">LB</div>
+                                    <div class="pos-pill" onclick="togglePosFilter('RB')">RB</div>
+                                    <div class="pos-pill" onclick="togglePosFilter('CDM')">CDM</div>
+                                    <div class="pos-pill" onclick="togglePosFilter('CM')">CM</div>
+                                    <div class="pos-pill" onclick="togglePosFilter('CAM')">CAM</div>
+                                    <div class="pos-pill" onclick="togglePosFilter('ST')">ST</div>
+                                    <div class="pos-pill" onclick="togglePosFilter('LW')">LW</div>
+                                    <div class="pos-pill" onclick="togglePosFilter('RW')">RW</div>
+                                    <div class="pos-pill !bg-red-500/20" onclick="clearPosFilters()">Reset</div>
+                                </div>
+                            </div>
+                            <div id="players-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2 relative"></div>
+                        </div>
+
+                        <!-- Tab: Trades -->
+                        <div id="panel-trades" class="hidden flex-col flex-1 overflow-y-auto p-4 gap-2" style="background:rgba(2,6,15,0.4)">
+                            <div id="trades-content"></div>
+                        </div>
+
+                        <!-- Tab: War Room -->
+                        <div id="panel-warroom" class="hidden flex flex-col flex-1 overflow-y-auto p-4 bg-slate-900/50">
+                            <div class="flex items-center justify-between mb-3">
+                                <div>
+                                    <h3 class="text-amber-400 font-bold uppercase tracking-widest text-sm"><i class="fas fa-clipboard-list mr-2"></i>Dpto. de Scouting</h3>
+                                    <p class="text-[10px] text-gray-500 mt-0.5">Informes confidenciales de tu equipo técnico</p>
+                                </div>
+                                <div id="picks-turn-counter" class="text-xs px-2 py-1 rounded-full font-bold bg-black/40 border border-white/10"></div>
+                            </div>
+                            <div id="team-needs-summary" class="bg-black/30 border border-white/10 rounded-lg p-2 mb-3 text-xs text-gray-300"></div>
+                            <div id="advisor-recommendations" class="flex flex-col gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. PANTALLA FINAL (GALARDONES) -->
+            <div id="end-screen" class="hidden w-full max-w-7xl flex-col gap-6 relative z-10 py-10">
+                <h1 class="text-4xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-2">RESULTADOS DEL DRAFT</h1>
+
+                <div class="glass p-6 mb-4">
+                    <h2 class="text-2xl font-bold text-center mb-6 uppercase tracking-widest text-gray-300">Premios de la Temporada</h2>
+                    <div id="awards-container" class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center"></div>
+                </div>
+
+                <div id="final-pitches-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full"></div>
+            </div>
 
     <!-- ================================
      CHAT PRIVADO
@@ -486,7 +486,7 @@ class="hidden absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-whit
     };
 
     let viewingUserId = myUserId; 
-    let maxRounds = 16; // 11 TITULARES + 5 BANQUILLO
+    let maxRounds = 20; // 11 TITULARES + 9 BANQUILLO
     let turnTime = 300; // 5 MINUTOS (300 segundos)
     let localTimerInterval = null;
     let isRevealing = false; 
@@ -510,13 +510,13 @@ class="hidden absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-whit
     let selectedGivePicks = [];
     let selectedGetPicks = [];
 
-    const emptyTeam = () => ({ POR: "", LD: "", DFC1: "", DFC2: "", LI: "", MC1: "", MC2: "", MC3: "", ED: "", EI: "", DC: "", SUB1: "", SUB2: "", SUB3: "", SUB4: "", SUB5: "" });
+    const emptyTeam = () => ({ POR: "", LD: "", DFC1: "", DFC2: "", LI: "", MC1: "", MC2: "", MC3: "", ED: "", EI: "", DC: "", SUB1: "", SUB2: "", SUB3: "", SUB4: "", SUB5: "", SUB6: "", SUB7: "", SUB8: "", SUB9: "" });
 
     const botPosRules = {
         'DC': ['ST','CF'], 'EI': ['LW', 'RW', 'LM'], 'ED': ['RW', 'LW', 'RM'],
         'MC1': ['CAM', 'CDM', 'CM', 'LM', 'RM'], 'MC2': ['CAM', 'CDM', 'CM', 'LM', 'RM'], 'MC3': ['CAM', 'CDM', 'CM', 'LM', 'RM'],
         'DFC1': ['CB'], 'DFC2': ['CB'], 'LI': ['LB','LWB'], 'LD': ['RB','RWB'], 'POR': ['GK'],
-        'SUB1': ['ANY'], 'SUB2': ['ANY'], 'SUB3': ['ANY'], 'SUB4': ['ANY'], 'SUB5': ['ANY']
+        'SUB1': ['ANY'], 'SUB2': ['ANY'], 'SUB3': ['ANY'], 'SUB4': ['ANY'], 'SUB5': ['ANY'], 'SUB6': ['ANY'], 'SUB7': ['ANY'], 'SUB8': ['ANY'], 'SUB9': ['ANY']
     };
 
     const getPitchHTML = (prefix = "slot") => `
@@ -528,12 +528,16 @@ class="hidden absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-whit
         </div>
         <div class="bg-black/30 rounded-lg p-2 border border-white/10 w-full relative z-10">
             <div class="text-[10px] text-gray-400 text-center mb-1.5 font-bold uppercase tracking-widest">Banquillo</div>
-            <div class="flex justify-around w-full gap-1">
-                <div class="player-card !w-[18%] !h-[70px]" id="${prefix}-SUB1" onclick="selectPitchSlot('${prefix}', 'SUB1')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
-                <div class="player-card !w-[18%] !h-[70px]" id="${prefix}-SUB2" onclick="selectPitchSlot('${prefix}', 'SUB2')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
-                <div class="player-card !w-[18%] !h-[70px]" id="${prefix}-SUB3" onclick="selectPitchSlot('${prefix}', 'SUB3')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
-                <div class="player-card !w-[18%] !h-[70px]" id="${prefix}-SUB4" onclick="selectPitchSlot('${prefix}', 'SUB4')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
-                <div class="player-card !w-[18%] !h-[70px]" id="${prefix}-SUB5" onclick="selectPitchSlot('${prefix}', 'SUB5')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
+            <div class="flex flex-wrap justify-center w-full gap-1.5">
+                <div class="player-card !w-[18%] !h-[60px]" id="${prefix}-SUB1" onclick="selectPitchSlot('${prefix}', 'SUB1')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
+                <div class="player-card !w-[18%] !h-[60px]" id="${prefix}-SUB2" onclick="selectPitchSlot('${prefix}', 'SUB2')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
+                <div class="player-card !w-[18%] !h-[60px]" id="${prefix}-SUB3" onclick="selectPitchSlot('${prefix}', 'SUB3')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
+                <div class="player-card !w-[18%] !h-[60px]" id="${prefix}-SUB4" onclick="selectPitchSlot('${prefix}', 'SUB4')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
+                <div class="player-card !w-[18%] !h-[60px]" id="${prefix}-SUB5" onclick="selectPitchSlot('${prefix}', 'SUB5')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
+                <div class="player-card !w-[18%] !h-[60px]" id="${prefix}-SUB6" onclick="selectPitchSlot('${prefix}', 'SUB6')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
+                <div class="player-card !w-[18%] !h-[60px]" id="${prefix}-SUB7" onclick="selectPitchSlot('${prefix}', 'SUB7')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
+                <div class="player-card !w-[18%] !h-[60px]" id="${prefix}-SUB8" onclick="selectPitchSlot('${prefix}', 'SUB8')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
+                <div class="player-card !w-[18%] !h-[60px]" id="${prefix}-SUB9" onclick="selectPitchSlot('${prefix}', 'SUB9')"><span class="text-gray-400 text-[10px] font-bold">SUB</span></div>
             </div>
         </div>
     `;
@@ -1235,7 +1239,7 @@ function renderTabs() {
 
 function fillPitchData(team, prefix) {
     team = team || {}; 
-    const slots = ['POR', 'LD', 'DFC1', 'DFC2', 'LI', 'MC1', 'MC2', 'MC3', 'ED', 'EI', 'DC', 'SUB1', 'SUB2', 'SUB3', 'SUB4', 'SUB5'];
+    const slots = ['POR', 'LD', 'DFC1', 'DFC2', 'LI', 'MC1', 'MC2', 'MC3', 'ED', 'EI', 'DC', 'SUB1', 'SUB2', 'SUB3', 'SUB4', 'SUB5', 'SUB6', 'SUB7', 'SUB8', 'SUB9'];
     slots.forEach(slot => {
         const el = document.getElementById(`${prefix}-${slot}`);
         if(!el) return;
@@ -1800,7 +1804,7 @@ function getGrade(player, userId) {
     // ==========================================
 function highlightCompatibleSlots(player) {
     const compatible = getCompatibleSlotsForPlayer(player, myUserId);
-    const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5'];
+    const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5','SUB6','SUB7','SUB8','SUB9'];
     allSlots.forEach(slot => {
         const el = document.getElementById(`slot-${slot}`);
         if (!el || el.classList.contains('filled')) return;
@@ -1939,7 +1943,7 @@ function pushDraftPickToFirebase(player, slotId, userId) {
     // ==========================================
 
     function getBenchNeeds(team) {
-        const subSlots = ['SUB1','SUB2','SUB3','SUB4','SUB5'];
+        const subSlots = ['SUB1','SUB2','SUB3','SUB4','SUB5','SUB6','SUB7','SUB8','SUB9'];
         const hasSub = (posList) => subSlots.some(s => team[s]?.id &&
             team[s].pos?.split(',').map(x => x.trim().toUpperCase()).some(p => posList.includes(p)));
         const needs = [];
@@ -1955,7 +1959,7 @@ function pushDraftPickToFirebase(player, slotId, userId) {
     function makeAutoPick(uId) {
         const u = serverState.users[uId];
         const team = u.team || {};
-        const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5'];
+        const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5','SUB6','SUB7','SUB8','SUB9'];
 
         let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
         let caches = getDraftContextCaches(uId);
