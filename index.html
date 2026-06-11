@@ -348,7 +348,9 @@ select option {
                     <div class="w-full lg:w-5/12 glass flex flex-col overflow-hidden">
                         <!-- Pestañas Agencia vs War Room -->
                         <div class="flex border-b border-white/10 bg-black/40">
-                            <button onclick="switchRightTab('agencia')" id="tab-agencia" class="flex-1 py-3 font-bold text-blue-400 border-b-2 border-blue-400">Agencia Libre</button>
+                            <button onclick="switchRightTab('agencia')" id="tab-agencia" class="flex-1 py-3 font-bold text-blue-400 border-b-2 border-blue-400">
+                                <i class="fas fa-file-signature text-blue-400 mr-1"></i> Agencia Libre
+                            </button>
                             <button onclick="switchRightTab('warroom')" id="tab-warroom" class="flex-1 py-3 font-bold text-gray-400 hover:text-white transition"><i class="fas fa-clipboard-list text-amber-400 mr-1"></i> Scouting</button>
                             <button onclick="switchRightTab('trades')" id="tab-trades" class="flex-1 py-3 font-bold text-gray-400 hover:text-white transition relative">
                                 <i class="fas fa-exchange-alt text-green-400 mr-1"></i> Trades
@@ -1414,8 +1416,8 @@ let _playerListOffset   = 0;
         return { oppNeeds, topAvail, numRivals };
     }
 
-    // Slots titulares vacíos donde encaja el jugador (deduplicados por nombre)
-    function getCompatibleSlotsForPlayer(player, userId) {
+    // Slots titulares vacíos donde encaja el jugador (deduplicados por nombre a menos que se pida lo contrario)
+    function getCompatibleSlotsForPlayer(player, userId, returnAll = false) {
         const team     = (serverState.users[userId] || {}).team || {};
         const pPos     = player.pos.split(',').map(s => s.trim().toUpperCase());
         const starters = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'];
@@ -1423,9 +1425,14 @@ let _playerListOffset   = 0;
         return starters.filter(s => {
             if (team[s] && team[s].id) return false;
             if (!(botPosRules[s].includes('ANY') || pPos.some(p => botPosRules[s].includes(p)))) return false;
-            const name = s.replace(/\d/g,'');
-            if (seen.has(name)) return false;
-            seen.add(name); return true;
+            
+            // Si returnAll es falso (por defecto), agrupamos. Si es verdadero, devolvemos todos.
+            if (!returnAll) {
+                const name = s.replace(/\d/g,'');
+                if (seen.has(name)) return false;
+                seen.add(name);
+            }
+            return true;
         });
     }
 
@@ -1803,8 +1810,10 @@ function getGrade(player, userId) {
     // CONFIRMACIÓN DE PICKS Y REVELACIÓN
     // ==========================================
 function highlightCompatibleSlots(player) {
-    const compatible = getCompatibleSlotsForPlayer(player, myUserId);
+    // Le pasamos "true" al final para obligarle a devolver todos los huecos repetidos
+    const compatible = getCompatibleSlotsForPlayer(player, myUserId, true); 
     const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5','SUB6','SUB7','SUB8','SUB9'];
+    
     allSlots.forEach(slot => {
         const el = document.getElementById(`slot-${slot}`);
         if (!el || el.classList.contains('filled')) return;
