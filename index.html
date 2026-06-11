@@ -353,7 +353,17 @@ select option {
                             </select>
                         </div>
                         <div class="flex flex-wrap gap-1.5" id="pos-filter-container">
-                            <div class="pos-pill" onclick="togglePosFilter('GK')">GK</div><div class="pos-pill" onclick="togglePosFilter('CB')">CB</div><div class="pos-pill" onclick="togglePosFilter('LB')">LB</div><div class="pos-pill" onclick="togglePosFilter('RB')">RB</div><div class="pos-pill" onclick="togglePosFilter('CDM')">CDM</div><div class="pos-pill" onclick="togglePosFilter('CM')">CM</div><div class="pos-pill" onclick="togglePosFilter('CAM')">CAM</div><div class="pos-pill" onclick="togglePosFilter('LM')">LM</div><div class="pos-pill" onclick="togglePosFilter('RM')">RM</div><div class="pos-pill" onclick="togglePosFilter('ST')">ST</div><div class="pos-pill" onclick="togglePosFilter('LW')">LW</div><div class="pos-pill" onclick="togglePosFilter('RW')">RW</div><div class="pos-pill !bg-red-500/20" onclick="clearPosFilters()">Reset</div>
+                            <div class="pos-pill" onclick="togglePosFilter('GK')">GK</div>
+                            <div class="pos-pill" onclick="togglePosFilter('CB')">CB</div>
+                            <div class="pos-pill" onclick="togglePosFilter('LB')">LB</div>
+                            <div class="pos-pill" onclick="togglePosFilter('RB')">RB</div>
+                            <div class="pos-pill" onclick="togglePosFilter('CDM')">CDM</div>
+                            <div class="pos-pill" onclick="togglePosFilter('CM')">CM</div>
+                            <div class="pos-pill" onclick="togglePosFilter('CAM')">CAM</div>
+                            <div class="pos-pill" onclick="togglePosFilter('ST')">ST</div>
+                            <div class="pos-pill" onclick="togglePosFilter('LW')">LW</div>
+                            <div class="pos-pill" onclick="togglePosFilter('RW')">RW</div>
+                            <div class="pos-pill !bg-red-500/20" onclick="clearPosFilters()">Reset</div>
                         </div>
                     </div>
                     <div id="players-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2 relative"></div>
@@ -1174,7 +1184,13 @@ function fillPitchData(team, prefix) {
 }
 
 function togglePosFilter(pos) { const idx = activePosFilters.indexOf(pos); if(idx > -1) activePosFilters.splice(idx, 1); else activePosFilters.push(pos); document.querySelectorAll('.pos-pill').forEach(pill => { if(activePosFilters.includes(pill.innerText)) pill.classList.add('active'); else pill.classList.remove('active'); }); renderPlayers(); }
-function clearPosFilters() { activePosFilters = []; document.querySelectorAll('.pos-pill').forEach(pill => pill.classList.remove('active')); renderPlayers(); }
+
+function clearPosFilters() { 
+    activePosFilters = []; 
+    document.querySelectorAll('.pos-pill').forEach(pill => pill.classList.remove('active')); 
+    document.getElementById('search-input').value = '';
+    renderPlayers(); 
+}
 
     // Lista filtrada actual y offset para lazy-load
 let _playerListFiltered = [];
