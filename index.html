@@ -2061,9 +2061,13 @@ function pushDraftPickToFirebase(player, slotId, userId) {
     }
 
     function _renderContactList() {
+        // ¡ESTA LÍNEA ES LA CLAVE! Si estamos dentro de un chat, abortamos para que no se cierre solo
+        if (_chatActiveUid) return; 
+
         const listView = document.getElementById('chat-list-view');
         const convView = document.getElementById('chat-conv-view');
         if (!listView || !convView) return;
+        
         listView.classList.remove('hidden'); listView.classList.add('flex', 'flex-col');
         convView.classList.add('hidden');   convView.classList.remove('flex');
 
@@ -2079,21 +2083,18 @@ function pushDraftPickToFirebase(player, slotId, userId) {
             const preview = last ? (last.from === myUserId ? '✓ ' : '') + last.text : 'Sin mensajes aún';
             html += `
         <div onclick="chatOpen('${uid}')"
-             class="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all"
-             style="hover:background:rgba(255,255,255,0.08)"
-             onmouseover="this.style.background='rgba(255,255,255,0.07)'"
-             onmouseout="this.style.background='transparent'">
-            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center font-black text-sm flex-shrink-0">
+             class="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all hover:bg-white/10">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center font-black text-sm flex-shrink-0 text-white">
                 ${u.nick.charAt(0).toUpperCase()}
             </div>
             <div class="flex-1 min-w-0">
                 <div class="font-bold text-sm text-white leading-tight">${u.nick}</div>
-                <div class="text-xs truncate mt-0.5" style="color:rgba(255,255,255,0.35)">${preview}</div>
+                <div class="text-xs truncate mt-0.5 text-gray-400">${preview}</div>
             </div>
-                ${unr > 0 ? `<span class="flex-shrink-0 w-5 h-5 bg-blue-500 rounded-full text-white text-[10px] font-black flex items-center justify-center">${unr}</span>` : ''}
+                ${unr > 0 ? `<span class="flex-shrink-0 w-5 h-5 bg-red-500 rounded-full text-white text-[10px] font-black flex items-center justify-center">${unr}</span>` : ''}
             </div>`;
         });
-        listView.innerHTML = html || '<div class="text-center text-sm py-8" style="color:rgba(255,255,255,0.3)">No hay otros mánagers</div>';
+        listView.innerHTML = html || '<div class="text-center text-sm py-8 text-gray-500">No hay otros mánagers</div>';
     }
 
     function chatOpen(uid) {
@@ -2149,14 +2150,17 @@ function pushDraftPickToFirebase(player, slotId, userId) {
         _chatUnread[cid] = 0;
         _updateChatBadge();
         
-        // SOLUCIÓN VISUAL: Si estamos dentro de un chat, NO renderizar la lista de contactos, 
-        // porque eso forzaba a la ventana a cerrarse.
-        if (!_chatActiveUid) {
-            _renderContactList();
+        // Obtenemos la hora exacta del ÚLTIMO mensaje de esta conversación
+        const msgs = _chatMessages[cid] || [];
+        let lastMessageTs = 0;
+        if (msgs.length > 0) {
+            lastMessageTs = msgs[msgs.length - 1].ts;
         }
         
-        // Escribe en la base de datos
-        db.ref('rooms/' + currentRoomId + '/dm/' + cid + '/seen_' + myUserId).set(Date.now());
+        // En lugar de tu hora local, guardamos la hora oficial de ese último mensaje como punto de referencia
+        db.ref('rooms/' + currentRoomId + '/dm/' + cid + '/seen_' + myUserId).set(
+            lastMessageTs > 0 ? lastMessageTs : firebase.database.ServerValue.TIMESTAMP
+        );
     }
 
     function chatSend() {
@@ -2164,9 +2168,14 @@ function pushDraftPickToFirebase(player, slotId, userId) {
         const input = document.getElementById('chat-input');
         const text  = input.value.trim();
         if (!text) return;
+        
+        // Usamos firebase.database.ServerValue.TIMESTAMP para evitar problemas de relojes desincronizados
         db.ref('rooms/' + currentRoomId + '/dm/' + _chatId(myUserId, _chatActiveUid) + '/messages').push({
-            from: myUserId, text, ts: Date.now()
+            from: myUserId, 
+            text: text, 
+            ts: firebase.database.ServerValue.TIMESTAMP 
         });
+        
         input.value = '';
     }
 
