@@ -587,17 +587,17 @@ error: function(err) {
     }
 
     function joinRoom() {
-    if(!db) return alert("Firebase no configurado.");
-    currentRoomId = document.getElementById('input-roomcode').value.trim().toUpperCase();
-    if(!currentRoomId) return alert("Introduce un código.");
-    
-    const nick = document.getElementById('input-nick').value.trim();
-    const team = document.getElementById('input-team').value.trim();
+        if(!db) return alert("Firebase no configurado.");
+        currentRoomId = document.getElementById('input-roomcode').value.trim().toUpperCase();
+        if(!currentRoomId) return alert("Introduce un código.");
+        
+        const nick = document.getElementById('input-nick').value.trim();
+        const team = document.getElementById('input-team').value.trim();
 
-    roomRef = db.ref('rooms/' + currentRoomId);
-    
-    roomRef.child('users').child(myUserId).set({
-        id: myUserId, 
+        roomRef = db.ref('rooms/' + currentRoomId);
+        
+        roomRef.child('users').child(myUserId).set({
+            id: myUserId, 
         nick: nick,      // Ahora 'nick' sí existe
         teamName: team,  // Ahora 'team' sí existe
         team: emptyTeam(), 
@@ -610,137 +610,137 @@ error: function(err) {
     });
 }
 
-    function enterLobbyUI() {
-        document.getElementById('step2-screen').classList.add('hidden');
-        document.getElementById('lobby-screen').classList.remove('hidden');
-        document.getElementById('news-ticker-container').classList.remove('hidden');
-        document.getElementById('lobby-code-display').innerText = currentRoomId;
-        if(isHost) {
-            document.getElementById('host-controls').classList.remove('hidden');
-            document.getElementById('host-controls').classList.add('flex');
-            document.getElementById('guest-controls').classList.add('hidden');
-        }
+function enterLobbyUI() {
+    document.getElementById('step2-screen').classList.add('hidden');
+    document.getElementById('lobby-screen').classList.remove('hidden');
+    document.getElementById('news-ticker-container').classList.remove('hidden');
+    document.getElementById('lobby-code-display').innerText = currentRoomId;
+    if(isHost) {
+        document.getElementById('host-controls').classList.remove('hidden');
+        document.getElementById('host-controls').classList.add('flex');
+        document.getElementById('guest-controls').classList.add('hidden');
+    }
+}
+
+function copyInviteLink() {
+    const url = window.location.origin + window.location.pathname + "?room=" + currentRoomId;
+    navigator.clipboard.writeText(url).then(() => alert("Link copiado!"));
+}
+
+function addBot() {
+    const botId = "bot_" + Math.random().toString(36).substr(2, 5);
+    roomRef.child('users').child(botId).set({ id: botId, nick: "Bot " + botCounter, teamName: "CPU " + botCounter, team: emptyTeam(), isBot: true });
+    botCounter++;
+}
+
+function startOnlineDraft() {
+    let userIds = Object.keys(serverState.users);
+    let randomizedUserIds = userIds.sort(() => Math.random() - 0.5);
+
+    let order = [];
+    for (let round = 1; round <= maxRounds; round++) {
+        let roundOrder = [...randomizedUserIds];
+        if (round % 2 === 0) roundOrder.reverse();
+        order.push(...roundOrder);
     }
 
-    function copyInviteLink() {
-        const url = window.location.origin + window.location.pathname + "?room=" + currentRoomId;
-        navigator.clipboard.writeText(url).then(() => alert("Link copiado!"));
+    if (userIds.length === 1) {
+        roomRef.update({ status: 'drafting', draftOrder: order, currentPickIndex: 0, turnEndTime: Date.now() + (turnTime * 1000) });
+    } else {
+        pushNews("¡El Comisionado ha iniciado el Sorteo del Draft!");
+        roomRef.update({ status: 'lottery', lotteryOrder: randomizedUserIds, draftOrder: order, currentPickIndex: 0 });
     }
-
-    function addBot() {
-        const botId = "bot_" + Math.random().toString(36).substr(2, 5);
-        roomRef.child('users').child(botId).set({ id: botId, nick: "Bot " + botCounter, teamName: "CPU " + botCounter, team: emptyTeam(), isBot: true });
-        botCounter++;
-    }
-
-    function startOnlineDraft() {
-        let userIds = Object.keys(serverState.users);
-        let randomizedUserIds = userIds.sort(() => Math.random() - 0.5);
-
-        let order = [];
-        for (let round = 1; round <= maxRounds; round++) {
-            let roundOrder = [...randomizedUserIds];
-            if (round % 2 === 0) roundOrder.reverse();
-            order.push(...roundOrder);
-        }
-
-        if (userIds.length === 1) {
-            roomRef.update({ status: 'drafting', draftOrder: order, currentPickIndex: 0, turnEndTime: Date.now() + (turnTime * 1000) });
-        } else {
-            pushNews("¡El Comisionado ha iniciado el Sorteo del Draft!");
-            roomRef.update({ status: 'lottery', lotteryOrder: randomizedUserIds, draftOrder: order, currentPickIndex: 0 });
-        }
-    }
+}
 
     // ==========================================
     // ESCUCHADOR FIREBASE Y ESTADOS
     // ==========================================
-    function listenToServer() {
-        roomRef.on('value', snap => {
-            const data = snap.val();
-            if(!data) return; 
+function listenToServer() {
+    roomRef.on('value', snap => {
+        const data = snap.val();
+        if(!data) return; 
 
-            const prevStatus = serverState.status;
-            serverState = data;
-            localTakenPlayers = data.takenPlayers || {};
-            updateNewsTickerUI(data.ticker);
+        const prevStatus = serverState.status;
+        serverState = data;
+        localTakenPlayers = data.takenPlayers || {};
+        updateNewsTickerUI(data.ticker);
 
-            if(data.status === 'lobby') updateLobbyList();
-            else if(data.status === 'lottery') {
-                if(prevStatus === 'lobby') {
-                    document.getElementById('lobby-screen').classList.add('hidden');
-                    document.getElementById('lottery-screen').classList.remove('hidden');
-                    document.getElementById('lottery-screen').classList.add('flex');
-                    playLotteryAnimation(data.lotteryOrder);
-                } 
+        if(data.status === 'lobby') updateLobbyList();
+        else if(data.status === 'lottery') {
+            if(prevStatus === 'lobby') {
+                document.getElementById('lobby-screen').classList.add('hidden');
+                document.getElementById('lottery-screen').classList.remove('hidden');
+                document.getElementById('lottery-screen').classList.add('flex');
+                playLotteryAnimation(data.lotteryOrder);
+            } 
+        }
+        else if(data.status === 'predraft') {
+            if(prevStatus === 'lottery') {
+                document.getElementById('lottery-screen').classList.add('hidden');
+                document.getElementById('lottery-screen').classList.remove('flex');
+                document.getElementById('predraft-screen').classList.remove('hidden');
+                document.getElementById('predraft-screen').classList.add('flex');
+                if(isHost) document.getElementById('predraft-host-controls').classList.remove('hidden');
             }
-            else if(data.status === 'predraft') {
-                if(prevStatus === 'lottery') {
-                    document.getElementById('lottery-screen').classList.add('hidden');
-                    document.getElementById('lottery-screen').classList.remove('flex');
-                    document.getElementById('predraft-screen').classList.remove('hidden');
-                    document.getElementById('predraft-screen').classList.add('flex');
-                    if(isHost) document.getElementById('predraft-host-controls').classList.remove('hidden');
-                }
-                renderPreDraftBoard();
-                renderTrades();
+            renderPreDraftBoard();
+            renderTrades();
+            initChat();
+        }
+        else if(data.status === 'drafting') {
+            if(prevStatus !== 'drafting') {
+                document.getElementById('lobby-screen').classList.add('hidden');
+                document.getElementById('lottery-screen').classList.add('hidden');
+                document.getElementById('predraft-screen').classList.add('hidden');
+                document.getElementById('predraft-screen').classList.remove('flex');
+                
+                document.getElementById('draft-screen').classList.remove('hidden');
+                document.getElementById('draft-screen').classList.add('flex');
+                document.getElementById('pitch-container').innerHTML = getPitchHTML("slot");
+                startLocalTimerLoop();
                 initChat();
+                updateDraftUI(); 
             }
-            else if(data.status === 'drafting') {
-                if(prevStatus !== 'drafting') {
-                    document.getElementById('lobby-screen').classList.add('hidden');
-                    document.getElementById('lottery-screen').classList.add('hidden');
-                    document.getElementById('predraft-screen').classList.add('hidden');
-                    document.getElementById('predraft-screen').classList.remove('flex');
-                    
-                    document.getElementById('draft-screen').classList.remove('hidden');
-                    document.getElementById('draft-screen').classList.add('flex');
-                    document.getElementById('pitch-container').innerHTML = getPitchHTML("slot");
-                    startLocalTimerLoop();
-                    initChat();
-                    updateDraftUI(); 
-                }
 
-                if(data.reveal && data.reveal.ts !== (window.lastRevealTs || 0)) {
-                    window.lastRevealTs = data.reveal.ts;
-                    triggerDramaticReveal(data.reveal);
-                } else if (!isRevealing) {
-                    updateDraftUI();
-                }
-                renderDraftTradesTab();
-                updateTradesBadge();
+            if(data.reveal && data.reveal.ts !== (window.lastRevealTs || 0)) {
+                window.lastRevealTs = data.reveal.ts;
+                triggerDramaticReveal(data.reveal);
+            } else if (!isRevealing) {
+                updateDraftUI();
             }
-            else if(data.status === 'finished') {
-                showEndScreen();
-            }
-        });
-    }
+            renderDraftTradesTab();
+            updateTradesBadge();
+        }
+        else if(data.status === 'finished') {
+            showEndScreen();
+        }
+    });
+}
 
-    function pushNews(msg) {
-        if(!roomRef) return;
-        let ticker = serverState.ticker || [];
-        ticker.push(msg);
-        if(ticker.length > 10) ticker.shift(); 
-        roomRef.update({ ticker });
-    }
+function pushNews(msg) {
+    if(!roomRef) return;
+    let ticker = serverState.ticker || [];
+    ticker.push(msg);
+    if(ticker.length > 10) ticker.shift(); 
+    roomRef.update({ ticker });
+}
 
-    function updateNewsTickerUI(tickerArr) {
-        if(!tickerArr || tickerArr.length === 0) return;
-        
-        const marq = document.getElementById('news-ticker');
-        
+function updateNewsTickerUI(tickerArr) {
+    if(!tickerArr || tickerArr.length === 0) return;
+    
+    const marq = document.getElementById('news-ticker');
+    
         // Creamos el texto de noticias (El último elemento del array es el más nuevo)
         // Lo ponemos en orden inverso para que lo más reciente salga primero
-        const reversedArr = [...tickerArr].reverse();
-        const newText = reversedArr.map(msg => `<span class="mx-8 font-black text-yellow-400">&bull;</span> ${msg}`).join('');
+    const reversedArr = [...tickerArr].reverse();
+    const newText = reversedArr.map(msg => `<span class="mx-8 font-black text-yellow-400">&bull;</span> ${msg}`).join('');
+    
+    if (marq.innerHTML !== newText) {
+        marq.innerHTML = newText;
         
-        if (marq.innerHTML !== newText) {
-            marq.innerHTML = newText;
-            
             // Calculamos la velocidad dinámica (30 píxeles por segundo es una velocidad de lectura cómoda)
-            const textWidth = marq.offsetWidth;
-            const screenWidth = window.innerWidth;
-            const totalDistance = screenWidth + textWidth;
+        const textWidth = marq.offsetWidth;
+        const screenWidth = window.innerWidth;
+        const totalDistance = screenWidth + textWidth;
             const readingSpeed = 80; // Píxeles por segundo (Baja este número si quieres que vaya más lento)
             const duration = totalDistance / readingSpeed;
 
@@ -2014,16 +2014,26 @@ function pushDraftPickToFirebase(player, slotId, userId) {
             if (uid === myUserId || serverState.users[uid].isBot) return;
             const cid = _chatId(myUserId, uid);
             if (_chatListeners[cid]) return;
+            
             _chatListeners[cid] = db.ref('rooms/' + currentRoomId + '/dm/' + cid)
             .on('value', snap => {
                 const d = snap.val() || {};
                 const msgs = Object.values(d.messages || {}).sort((a,b) => a.ts - b.ts);
                 _chatMessages[cid] = msgs;
                 const seen = d['seen_' + myUserId] || 0;
+                
                 _chatUnread[cid] = msgs.filter(m => m.from !== myUserId && m.ts > seen).length;
                 _updateChatBadge();
-                if (_chatActiveUid === uid) { _renderMessages(cid); _markSeen(cid); }
-                else _renderContactList();
+                
+                if (_chatActiveUid === uid) { 
+                    _renderMessages(cid); 
+                    // SOLUCIÓN AL BUCLE: Solo marcar si realmente hay mensajes sin leer
+                    if (_chatUnread[cid] > 0) {
+                        _markSeen(cid); 
+                    }
+                } else {
+                    _renderContactList();
+                }
             });
         });
         _renderContactList();
@@ -2091,23 +2101,26 @@ function pushDraftPickToFirebase(player, slotId, userId) {
         const u   = serverState.users[uid];
         const cid = _chatId(myUserId, uid);
         
-        // 1. Ocultar la lista de contactos quitando también el 'flex'
+        // Quitar la lista correctamente
         const listView = document.getElementById('chat-list-view');
         listView.classList.add('hidden');
-        listView.classList.remove('flex', 'flex-col'); // ¡Esta línea es la clave que faltaba!
+        listView.classList.remove('flex', 'flex-col');
         
-        // 2. Mostrar la ventana de conversación
+        // Mostrar la ventana de conversación
         const conv = document.getElementById('chat-conv-view');
         conv.classList.remove('hidden'); 
         conv.classList.add('flex');
         
-        // 3. Rellenar datos del usuario objetivo
         document.getElementById('chat-conv-title').innerText  = u.nick;
         document.getElementById('chat-conv-avatar').innerText = u.nick.charAt(0).toUpperCase();
         
-        // 4. Renderizar mensajes y marcar como leídos
         _renderMessages(cid);
-        _markSeen(cid);
+        
+        // SOLUCIÓN AL BUCLE: Solo marcar si realmente hay mensajes sin leer
+        if (_chatUnread[cid] > 0) {
+            _markSeen(cid);
+        }
+        
         setTimeout(() => document.getElementById('chat-input').focus(), 50);
     }
 
@@ -2135,7 +2148,14 @@ function pushDraftPickToFirebase(player, slotId, userId) {
     function _markSeen(cid) {
         _chatUnread[cid] = 0;
         _updateChatBadge();
-        _renderContactList();
+        
+        // SOLUCIÓN VISUAL: Si estamos dentro de un chat, NO renderizar la lista de contactos, 
+        // porque eso forzaba a la ventana a cerrarse.
+        if (!_chatActiveUid) {
+            _renderContactList();
+        }
+        
+        // Escribe en la base de datos
         db.ref('rooms/' + currentRoomId + '/dm/' + cid + '/seen_' + myUserId).set(Date.now());
     }
 
