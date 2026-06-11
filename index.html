@@ -587,20 +587,28 @@ error: function(err) {
     }
 
     function joinRoom() {
-        if(!db) return alert("Firebase no configurado.");
-        currentRoomId = document.getElementById('input-roomcode').value.trim().toUpperCase();
-        if(!currentRoomId) return alert("Introduce un código.");
-        roomRef = db.ref('rooms/' + currentRoomId);
-        
-        roomRef.child('users').child(myUserId).set({
-            id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false
-        }).then(() => { 
-            enterLobbyUI(); 
-            listenToServer(); 
-            roomRef.child('users').child(myUserId).onDisconnect().remove();
-            sessionStorage.setItem('draftSession', JSON.stringify({ roomId: currentRoomId, userId: myUserId, nick, team }));
-        });
-    }
+    if(!db) return alert("Firebase no configurado.");
+    currentRoomId = document.getElementById('input-roomcode').value.trim().toUpperCase();
+    if(!currentRoomId) return alert("Introduce un código.");
+    
+    const nick = document.getElementById('input-nick').value.trim();
+    const team = document.getElementById('input-team').value.trim();
+
+    roomRef = db.ref('rooms/' + currentRoomId);
+    
+    roomRef.child('users').child(myUserId).set({
+        id: myUserId, 
+        nick: nick,      // Ahora 'nick' sí existe
+        teamName: team,  // Ahora 'team' sí existe
+        team: emptyTeam(), 
+        isBot: false
+    }).then(() => { 
+        enterLobbyUI(); 
+        listenToServer(); 
+        roomRef.child('users').child(myUserId).onDisconnect().remove();
+        sessionStorage.setItem('draftSession', JSON.stringify({ roomId: currentRoomId, userId: myUserId, nick, team }));
+    });
+}
 
     function enterLobbyUI() {
         document.getElementById('step2-screen').classList.add('hidden');
