@@ -88,6 +88,21 @@
             white-space: nowrap;
             /* La duración se asigna con JS basándose en la longitud del texto */
         }
+
+        .chat-panel-hidden {
+            opacity: 0; transform: translateY(12px) scale(0.96);
+            pointer-events: none;
+            transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .chat-panel-visible {
+            opacity: 1; transform: translateY(0) scale(1);
+            pointer-events: all;
+            transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #chat-btn { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        #chat-btn:hover { transform: scale(1.08); box-shadow: 0 0 20px rgba(59,130,246,0.5); }
+        .chat-msg-me   { background: linear-gradient(135deg,#2563eb,#1d4ed8); border-radius: 18px 18px 4px 18px; }
+        .chat-msg-them { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px 18px 18px 4px; }
     </style>
 </head>
 <body class="p-4 md:p-8 flex flex-col items-center min-h-screen relative">
@@ -347,6 +362,56 @@
         <div id="final-pitches-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full"></div>
     </div>
 
+    <!-- ================================
+     CHAT PRIVADO
+================================ -->
+<div id="chat-bubble-container" class="hidden fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+
+    <!-- Panel -->
+    <div id="chat-panel" class="chat-panel-hidden w-80 flex flex-col rounded-2xl overflow-hidden shadow-2xl"
+    style="height:420px; background:rgba(15,23,42,0.97); border:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(20px);">
+
+    <!-- Header lista -->
+    <div class="flex items-center justify-between px-4 py-3 flex-shrink-0" style="border-bottom:1px solid rgba(255,255,255,0.07);">
+        <span class="font-bold text-white text-sm tracking-wide">Mensajes</span>
+        <button onclick="toggleChatPanel()" class="text-gray-500 hover:text-white transition text-lg leading-none">&times;</button>
+    </div>
+
+    <!-- Vista: lista de contactos -->
+    <div id="chat-list-view" class="flex-1 overflow-y-auto py-2 px-2"></div>
+
+    <!-- Vista: conversación (oculta por defecto) -->
+    <div id="chat-conv-view" class="hidden flex-col flex-1 overflow-hidden">
+        <div class="flex items-center gap-2 px-3 py-2 flex-shrink-0" style="border-bottom:1px solid rgba(255,255,255,0.07);">
+            <button onclick="chatBackToList()" class="text-gray-400 hover:text-white transition p-1">
+                <i class="fas fa-arrow-left text-xs"></i>
+            </button>
+            <div id="chat-conv-avatar" class="w-7 h-7 rounded-full bg-blue-700 flex items-center justify-center text-xs font-black flex-shrink-0"></div>
+            <span id="chat-conv-title" class="font-bold text-white text-sm truncate"></span>
+        </div>
+        <div id="chat-messages-list" class="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-1"></div>
+        <div class="flex gap-2 p-3 flex-shrink-0" style="border-top:1px solid rgba(255,255,255,0.07);">
+            <input id="chat-input" type="text" placeholder="Mensaje secreto..."
+            onkeydown="chatKeydown(event)"
+            class="flex-1 rounded-xl px-3 py-2 text-sm text-white outline-none"
+            style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1);">
+            <button onclick="chatSend()"
+            class="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-3 py-2 transition flex-shrink-0">
+            <i class="fas fa-paper-plane text-xs"></i>
+        </button>
+    </div>
+</div>
+</div>
+
+<!-- Botón burbuja -->
+<button id="chat-btn" onclick="toggleChatPanel()"
+class="w-14 h-14 bg-blue-600 rounded-full shadow-xl flex items-center justify-center relative">
+<i class="fas fa-comment-alt text-white text-xl"></i>
+<span id="chat-unread-badge"
+class="hidden absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-[10px] font-black flex items-center justify-center shadow-lg">0</span>
+</button>
+</div>
+
 <script>
     // ==========================================
     // VARIABLES GLOBALES Y ESTADO
@@ -357,7 +422,7 @@
     let currentRoomId = null;
     let roomRef = null;
     let isHost = false;
-    
+
     let serverState = {
         status: 'lobby', host: null, users: {}, draftOrder: [], lotteryOrder: [], currentPickIndex: 0, turnEndTime: 0, takenPlayers: {}, reveal: null, trades: {}, ticker: []
     };
@@ -373,15 +438,15 @@
     let botCounter = 1;
     let _posBuckets = {};
 
-function _buildPosBuckets() {
-    _posBuckets = {};
-    availablePlayers.forEach(p => {
-        p.pos.split(',').map(s => s.trim().toUpperCase()).forEach(pos => {
-            if (!_posBuckets[pos]) _posBuckets[pos] = [];
+    function _buildPosBuckets() {
+        _posBuckets = {};
+        availablePlayers.forEach(p => {
+            p.pos.split(',').map(s => s.trim().toUpperCase()).forEach(pos => {
+                if (!_posBuckets[pos]) _posBuckets[pos] = [];
             _posBuckets[pos].push(p); // ya vienen ordenados por rat desc
         });
-    });
-}
+        });
+    }
     let _searchTimer = null;
     let tradeTargetUid = null;
     let selectedGivePicks = [];
@@ -417,26 +482,26 @@ function _buildPosBuckets() {
 
 
     function tryReconnect() {
-    const saved = JSON.parse(sessionStorage.getItem('draftSession') || 'null');
-    if (!saved) return;
-    myUserId = saved.userId;
-    currentRoomId = saved.roomId;
-    document.getElementById('input-nick').value = saved.nick;
-    document.getElementById('input-team').value = saved.team;
-    roomRef = db.ref('rooms/' + currentRoomId);
-    roomRef.once('value').then(snap => {
-        const data = snap.val();
-        if (!data || !data.users || !data.users[myUserId] || data.status === 'finished') {
-            sessionStorage.removeItem('draftSession'); return;
-        }
-        isHost = data.host === myUserId;
-        document.getElementById('step1-screen').classList.add('hidden');
-        document.getElementById('news-ticker-container').classList.remove('hidden');
-        enterLobbyUI();
-        listenToServer();
-        showCustomAlert('¡Reconectado a la sala ' + currentRoomId + '!');
-    });
-}
+        const saved = JSON.parse(sessionStorage.getItem('draftSession') || 'null');
+        if (!saved) return;
+        myUserId = saved.userId;
+        currentRoomId = saved.roomId;
+        document.getElementById('input-nick').value = saved.nick;
+        document.getElementById('input-team').value = saved.team;
+        roomRef = db.ref('rooms/' + currentRoomId);
+        roomRef.once('value').then(snap => {
+            const data = snap.val();
+            if (!data || !data.users || !data.users[myUserId] || data.status === 'finished') {
+                sessionStorage.removeItem('draftSession'); return;
+            }
+            isHost = data.host === myUserId;
+            document.getElementById('step1-screen').classList.add('hidden');
+            document.getElementById('news-ticker-container').classList.remove('hidden');
+            enterLobbyUI();
+            listenToServer();
+            showCustomAlert('¡Reconectado a la sala ' + currentRoomId + '!');
+        });
+    }
 
     // ==========================================
     // AUTO-CARGA DE DATOS E INICIO
@@ -447,9 +512,9 @@ function _buildPosBuckets() {
         if(urlParams.has('room')) document.getElementById('input-roomcode').value = urlParams.get('room');
 
         document.getElementById('search-input').addEventListener('input', () => {
-        clearTimeout(_searchTimer);
-        _searchTimer = setTimeout(renderPlayers, 280);
-    });
+            clearTimeout(_searchTimer);
+            _searchTimer = setTimeout(renderPlayers, 280);
+        });
         
         // 2. Auto-cargar la base de datos (db.csv)
         loadDatabaseAutomatically();
@@ -465,13 +530,13 @@ function _buildPosBuckets() {
             header: true, 
             skipEmptyLines: true,
             complete: function(results) {
-    availablePlayers = results.data.map(row => ({
-        id: row.ID, name: row.Name, rat: parseInt(row.OVR),
-        pac: parseInt(row.PAC||0), sho: parseInt(row.SHO||0), pas: parseInt(row.PAS||0),
-        dri: parseInt(row.DRI||0), def: parseInt(row.DEF||0), pos: row.POS || "N/A"
-    })).filter(p => p.name && !isNaN(p.rat));
+                availablePlayers = results.data.map(row => ({
+                    id: row.ID, name: row.Name, rat: parseInt(row.OVR),
+                    pac: parseInt(row.PAC||0), sho: parseInt(row.SHO||0), pas: parseInt(row.PAS||0),
+                    dri: parseInt(row.DRI||0), def: parseInt(row.DEF||0), pos: row.POS || "N/A"
+                })).filter(p => p.name && !isNaN(p.rat));
 
-    availablePlayers.sort((a,b) => b.rat - a.rat);
+                availablePlayers.sort((a,b) => b.rat - a.rat);
     _buildPosBuckets(); // ← solo esta línea añadida aquí
 
     statusEl.innerText = `¡Éxito! ${availablePlayers.length} jugadores cargados.`;
@@ -479,12 +544,12 @@ function _buildPosBuckets() {
     document.getElementById('btn-next').disabled = false;
     tryReconnect();
 },
-            error: function(err) {
-                statusEl.innerText = "Error: No se ha encontrado el archivo db.csv";
-                statusEl.classList.replace('text-yellow-400', 'text-red-500');
-                console.error(err);
-            }
-        });
+error: function(err) {
+    statusEl.innerText = "Error: No se ha encontrado el archivo db.csv";
+    statusEl.classList.replace('text-yellow-400', 'text-red-500');
+    console.error(err);
+}
+});
     }
 
     function goToLobbyChoice() {
@@ -517,12 +582,12 @@ function _buildPosBuckets() {
         roomRef = db.ref('rooms/' + currentRoomId);
         
         roomRef.child('users').child(myUserId).set({
-    id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false
-}).then(() => { 
-    enterLobbyUI(); 
-    listenToServer(); 
-    roomRef.child('users').child(myUserId).onDisconnect().remove();
-    sessionStorage.setItem('draftSession', JSON.stringify({ roomId: currentRoomId, userId: myUserId, nick, team }));
+            id: myUserId, nick: nick, teamName: team, team: emptyTeam(), isBot: false
+        }).then(() => { 
+            enterLobbyUI(); 
+            listenToServer(); 
+            roomRef.child('users').child(myUserId).onDisconnect().remove();
+            sessionStorage.setItem('draftSession', JSON.stringify({ roomId: currentRoomId, userId: myUserId, nick, team }));
         });
     }
 
@@ -600,6 +665,7 @@ function _buildPosBuckets() {
                 }
                 renderPreDraftBoard();
                 renderTrades();
+                initChat();
             }
             else if(data.status === 'drafting') {
                 if(prevStatus !== 'drafting') {
@@ -612,6 +678,7 @@ function _buildPosBuckets() {
                     document.getElementById('draft-screen').classList.add('flex');
                     document.getElementById('pitch-container').innerHTML = getPitchHTML("slot");
                     startLocalTimerLoop();
+                    initChat();
                     updateDraftUI(); 
                 }
 
@@ -701,7 +768,7 @@ function _buildPosBuckets() {
         msgEl.innerText = "Mezclando equipos...";
         revealEl.style.transform = "scale(1)";
         for(let i=0; i<20; i++) { revealEl.innerText = serverState.users[orderIds[Math.floor(Math.random() * orderIds.length)]].teamName; await delay(120); }
-        revealEl.style.transform = "scale(0)"; await delay(500);
+            revealEl.style.transform = "scale(0)"; await delay(500);
 
         for (let i = orderIds.length - 1; i >= 0; i--) {
             msgEl.innerText = i === 0 ? "¡Y EL PICK #1 ES PARA..." : `En el Pick #${i + 1} elige...`;
@@ -734,7 +801,7 @@ function _buildPosBuckets() {
             const roundEnd = Math.min(roundStart + numPlayers, totalPicks);
             html += `<div class="mb-3">
                 <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1.5">Ronda ${r + 1}</div>
-                <div class="flex flex-wrap gap-1.5">`;
+            <div class="flex flex-wrap gap-1.5">`;
             for (let i = roundStart; i < roundEnd; i++) {
                 const uid = serverState.draftOrder[i];
                 const u = serverState.users[uid];
@@ -745,10 +812,10 @@ function _buildPosBuckets() {
                 const isGet  = selectedGetPicks.includes(i);
 
                 let baseClass = isMe
-                    ? 'bg-blue-900/40 border-blue-600 text-blue-300'
-                    : isBot
-                        ? 'bg-black/20 border-white/10 text-gray-600 cursor-not-allowed opacity-50'
-                        : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/15';
+                ? 'bg-blue-900/40 border-blue-600 text-blue-300'
+                : isBot
+                ? 'bg-black/20 border-white/10 text-gray-600 cursor-not-allowed opacity-50'
+                : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/15';
                 let extraClass = '';
                 if (isGive) extraClass = 'predraft-give';
                 else if (isGet) extraClass = 'predraft-get';
@@ -762,95 +829,95 @@ function _buildPosBuckets() {
                     <div class="text-[9px] text-gray-500 leading-none">Pick #${i + 1}</div>
                     <div class="font-bold text-xs leading-tight mt-0.5">${u.nick}</div>
                     ${badge}
-                </div>`;
-            }
-            html += `</div></div>`;
+            </div>`;
         }
-        board.innerHTML = html;
-        updatePreDraftStatusBar();
-        updateDraftTracker();
+        html += `</div></div>`;
     }
+    board.innerHTML = html;
+    updatePreDraftStatusBar();
+    updateDraftTracker();
+}
 
-    function handlePickClick(pickIndex) {
-        const uid = serverState.draftOrder[pickIndex];
-        const u = serverState.users[uid];
-        if (!u || u.isBot) return;
+function handlePickClick(pickIndex) {
+    const uid = serverState.draftOrder[pickIndex];
+    const u = serverState.users[uid];
+    if (!u || u.isBot) return;
 
-        if (uid === myUserId) {
+    if (uid === myUserId) {
             // Toggle as a "give" pick directly from the board
-            if (selectedGivePicks.includes(pickIndex)) {
-                selectedGivePicks = selectedGivePicks.filter(i => i !== pickIndex);
-            } else {
-                selectedGivePicks.push(pickIndex);
-            }
-            if (tradeTargetUid) renderTradeButtons(tradeTargetUid);
+        if (selectedGivePicks.includes(pickIndex)) {
+            selectedGivePicks = selectedGivePicks.filter(i => i !== pickIndex);
         } else {
+            selectedGivePicks.push(pickIndex);
+        }
+        if (tradeTargetUid) renderTradeButtons(tradeTargetUid);
+    } else {
             // Pre-select their pick as "get" and open/update trade panel
-            if (tradeTargetUid !== uid) {
+        if (tradeTargetUid !== uid) {
                 // Switching target: keep my give picks, reset get picks
-                selectedGetPicks = [];
-                tradeTargetUid = uid;
-            }
+            selectedGetPicks = [];
+            tradeTargetUid = uid;
+        }
             // Auto-toggle their pick in "get"
-            if (selectedGetPicks.includes(pickIndex)) {
-                selectedGetPicks = selectedGetPicks.filter(i => i !== pickIndex);
-            } else {
-                selectedGetPicks.push(pickIndex);
-            }
-            document.getElementById('trade-panel').classList.remove('hidden');
-            document.getElementById('trade-target-name').innerText = u.nick;
-            renderTradeButtons(uid);
-        }
-        renderPreDraftBoard();
-    }
-
-    function updatePreDraftStatusBar() {
-        const bar = document.getElementById('predraft-status-bar');
-        const giveEl = document.getElementById('status-give');
-        const getEl  = document.getElementById('status-get');
-        if (!bar) return;
-        const hasAny = selectedGivePicks.length > 0 || selectedGetPicks.length > 0;
-        bar.classList.toggle('hidden', !hasAny);
-        giveEl.innerText = selectedGivePicks.length > 0 ? selectedGivePicks.map(i => `#${i+1}`).join(', ') : '-';
-        getEl.innerText  = selectedGetPicks.length  > 0 ? selectedGetPicks.map(i => `#${i+1}`).join(', ')  : '-';
-    }
-
-    function clearTradeSelection() {
-        selectedGivePicks = []; selectedGetPicks = []; tradeTargetUid = null;
-        document.getElementById('trade-panel').classList.add('hidden');
-        renderPreDraftBoard();
-    }
-
-    function renderTradeButtons(targetUid) {
-        const sGive = document.getElementById('trade-give');
-        const sGet = document.getElementById('trade-get');
-        sGive.innerHTML = ''; sGet.innerHTML = '';
-
-        serverState.draftOrder.forEach((uid, i) => {
-            if(uid === myUserId) {
-                const isSelected = selectedGivePicks.includes(i);
-                // Color AZUL brillante si está seleccionado
-                const colorClass = isSelected ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'bg-black/50 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white';
-                sGive.innerHTML += `<div onclick="toggleTradePick('give', ${i})" class="cursor-pointer select-none transition-all duration-200 p-2 text-center text-sm font-bold rounded border ${colorClass}">Pick #${i+1}</div>`;
-            }
-            if(uid === targetUid) {
-                const isSelected = selectedGetPicks.includes(i);
-                // Color VERDE brillante si está seleccionado
-                const colorClass = isSelected ? 'bg-green-600 border-green-400 text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-black/50 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white';
-                sGet.innerHTML += `<div onclick="toggleTradePick('get', ${i})" class="cursor-pointer select-none transition-all duration-200 p-2 text-center text-sm font-bold rounded border ${colorClass}">Pick #${i+1}</div>`;
-            }
-        });
-    }
-
-    function toggleTradePick(type, index) {
-        if (type === 'give') {
-            if (selectedGivePicks.includes(index)) selectedGivePicks = selectedGivePicks.filter(i => i !== index);
-            else selectedGivePicks.push(index);
+        if (selectedGetPicks.includes(pickIndex)) {
+            selectedGetPicks = selectedGetPicks.filter(i => i !== pickIndex);
         } else {
-            if (selectedGetPicks.includes(index)) selectedGetPicks = selectedGetPicks.filter(i => i !== index);
-            else selectedGetPicks.push(index);
+            selectedGetPicks.push(pickIndex);
         }
-        renderTradeButtons(tradeTargetUid);
+        document.getElementById('trade-panel').classList.remove('hidden');
+        document.getElementById('trade-target-name').innerText = u.nick;
+        renderTradeButtons(uid);
+    }
+    renderPreDraftBoard();
+}
+
+function updatePreDraftStatusBar() {
+    const bar = document.getElementById('predraft-status-bar');
+    const giveEl = document.getElementById('status-give');
+    const getEl  = document.getElementById('status-get');
+    if (!bar) return;
+    const hasAny = selectedGivePicks.length > 0 || selectedGetPicks.length > 0;
+    bar.classList.toggle('hidden', !hasAny);
+    giveEl.innerText = selectedGivePicks.length > 0 ? selectedGivePicks.map(i => `#${i+1}`).join(', ') : '-';
+    getEl.innerText  = selectedGetPicks.length  > 0 ? selectedGetPicks.map(i => `#${i+1}`).join(', ')  : '-';
+}
+
+function clearTradeSelection() {
+    selectedGivePicks = []; selectedGetPicks = []; tradeTargetUid = null;
+    document.getElementById('trade-panel').classList.add('hidden');
+    renderPreDraftBoard();
+}
+
+function renderTradeButtons(targetUid) {
+    const sGive = document.getElementById('trade-give');
+    const sGet = document.getElementById('trade-get');
+    sGive.innerHTML = ''; sGet.innerHTML = '';
+
+    serverState.draftOrder.forEach((uid, i) => {
+        if(uid === myUserId) {
+            const isSelected = selectedGivePicks.includes(i);
+                // Color AZUL brillante si está seleccionado
+            const colorClass = isSelected ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'bg-black/50 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white';
+            sGive.innerHTML += `<div onclick="toggleTradePick('give', ${i})" class="cursor-pointer select-none transition-all duration-200 p-2 text-center text-sm font-bold rounded border ${colorClass}">Pick #${i+1}</div>`;
+        }
+        if(uid === targetUid) {
+            const isSelected = selectedGetPicks.includes(i);
+                // Color VERDE brillante si está seleccionado
+            const colorClass = isSelected ? 'bg-green-600 border-green-400 text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-black/50 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white';
+            sGet.innerHTML += `<div onclick="toggleTradePick('get', ${i})" class="cursor-pointer select-none transition-all duration-200 p-2 text-center text-sm font-bold rounded border ${colorClass}">Pick #${i+1}</div>`;
+        }
+    });
+}
+
+function toggleTradePick(type, index) {
+    if (type === 'give') {
+        if (selectedGivePicks.includes(index)) selectedGivePicks = selectedGivePicks.filter(i => i !== index);
+        else selectedGivePicks.push(index);
+    } else {
+        if (selectedGetPicks.includes(index)) selectedGetPicks = selectedGetPicks.filter(i => i !== index);
+        else selectedGetPicks.push(index);
+    }
+    renderTradeButtons(tradeTargetUid);
         renderPreDraftBoard(); // Sync visual state on board
     }
 
@@ -884,7 +951,7 @@ function _buildPosBuckets() {
                             <button onclick="resolveTrade('${tid}', true)" class="bg-green-500 px-3 py-1 rounded text-white font-bold text-xs">Aceptar</button>
                             <button onclick="resolveTrade('${tid}', false)" class="bg-red-500 px-3 py-1 rounded text-white font-bold text-xs">Rechazar</button>
                         </div>
-                    </div>`;
+                </div>`;
             }
         });
     }
@@ -956,116 +1023,116 @@ function _buildPosBuckets() {
     }
 
     function playTurnBeep() {
-    try {
-        const ctx = new AudioContext();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.connect(g); g.connect(ctx.destination);
-        o.frequency.value = 880;
-        g.gain.setValueAtTime(0.3, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-        o.start(); o.stop(ctx.currentTime + 0.4);
-    } catch(e) {}
-}
+        try {
+            const ctx = new AudioContext();
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value = 880;
+            g.gain.setValueAtTime(0.3, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+            o.start(); o.stop(ctx.currentTime + 0.4);
+        } catch(e) {}
+    }
 
 let _prevActiveUid = null; // ← también añade esta variable aquí
 
-    function updateDraftUI() {
-        updateDraftTracker();
-        document.getElementById('round-indicator').innerText = serverState.currentPickIndex + 1;
-        const activeUid = serverState.draftOrder[serverState.currentPickIndex];
-        const activeUser = serverState.users[activeUid];
-        if (activeUid === myUserId && _prevActiveUid !== myUserId) playTurnBeep();
-_prevActiveUid = activeUid;
-        if(!activeUser) return showEndScreen();
-        
-        document.getElementById('current-turn-name').innerText = (activeUid === myUserId) ? "¡TU TURNO!" : activeUser.nick;
-        const header = document.getElementById('draft-header');
-        if(activeUid === myUserId) {
-            header.classList.add('my-turn-glow'); document.getElementById('timer').classList.replace('text-green-400', 'text-yellow-400');
-        } else {
-            header.classList.remove('my-turn-glow'); document.getElementById('timer').classList.replace('text-yellow-400', 'text-green-400');
-        }
+function updateDraftUI() {
+    updateDraftTracker();
+    document.getElementById('round-indicator').innerText = serverState.currentPickIndex + 1;
+    const activeUid = serverState.draftOrder[serverState.currentPickIndex];
+    const activeUser = serverState.users[activeUid];
+    if (activeUid === myUserId && _prevActiveUid !== myUserId) playTurnBeep();
+    _prevActiveUid = activeUid;
+    if(!activeUser) return showEndScreen();
+
+    document.getElementById('current-turn-name').innerText = (activeUid === myUserId) ? "¡TU TURNO!" : activeUser.nick;
+    const header = document.getElementById('draft-header');
+    if(activeUid === myUserId) {
+        header.classList.add('my-turn-glow'); document.getElementById('timer').classList.replace('text-green-400', 'text-yellow-400');
+    } else {
+        header.classList.remove('my-turn-glow'); document.getElementById('timer').classList.replace('text-yellow-400', 'text-green-400');
+    }
 
         // Avg OVR display
-        const myTeam = (serverState.users[myUserId] || {}).team || {};
-        let sum = 0, count = 0;
-        Object.values(myTeam).forEach(p => { if(p && p.id) { sum += p.rat; count++; } });
-        const avgEl = document.getElementById('my-avg-ovr');
-        if (avgEl) avgEl.innerText = count > 0 ? (sum / count).toFixed(1) : '-';
+    const myTeam = (serverState.users[myUserId] || {}).team || {};
+    let sum = 0, count = 0;
+    Object.values(myTeam).forEach(p => { if(p && p.id) { sum += p.rat; count++; } });
+    const avgEl = document.getElementById('my-avg-ovr');
+    if (avgEl) avgEl.innerText = count > 0 ? (sum / count).toFixed(1) : '-';
 
         // Picks until turn badge
-        const picksEl = document.getElementById('picks-until-turn-badge');
-        if (picksEl) {
-            if (activeUid === myUserId) {
-                picksEl.innerText = '⚡ TU TURNO'; picksEl.className = 'text-xs font-bold px-2 py-1 rounded-full bg-yellow-500 text-black border border-yellow-400';
+    const picksEl = document.getElementById('picks-until-turn-badge');
+    if (picksEl) {
+        if (activeUid === myUserId) {
+            picksEl.innerText = '⚡ TU TURNO'; picksEl.className = 'text-xs font-bold px-2 py-1 rounded-full bg-yellow-500 text-black border border-yellow-400';
+            picksEl.classList.remove('hidden');
+        } else {
+            const p = getPicksUntilMyTurn();
+            if (p > 0) {
+                picksEl.innerText = p === 1 ? '⚠️ Siguiente turno' : `${p} picks para tu turno`;
+                picksEl.className = `text-xs font-bold px-2 py-1 rounded-full border ${p === 1 ? 'bg-red-900/60 border-red-500 text-red-300' : p <= 3 ? 'bg-orange-900/40 border-orange-600 text-orange-300' : 'bg-white/10 border-white/20 text-gray-400'}`;
                 picksEl.classList.remove('hidden');
             } else {
-                const p = getPicksUntilMyTurn();
-                if (p > 0) {
-                    picksEl.innerText = p === 1 ? '⚠️ Siguiente turno' : `${p} picks para tu turno`;
-                    picksEl.className = `text-xs font-bold px-2 py-1 rounded-full border ${p === 1 ? 'bg-red-900/60 border-red-500 text-red-300' : p <= 3 ? 'bg-orange-900/40 border-orange-600 text-orange-300' : 'bg-white/10 border-white/20 text-gray-400'}`;
-                    picksEl.classList.remove('hidden');
-                } else {
-                    picksEl.classList.add('hidden');
-                }
-            }
-        }
-
-        renderTabs();
-        const userToView = serverState.users[viewingUserId] || serverState.users[myUserId];
-        fillPitchData(userToView.team, "slot");
-        updateAdvisor();
-        renderPlayers();
-
-        if(isHost && activeUser.isBot && !isRevealing) {
-            if(window.botWorkingForIndex !== serverState.currentPickIndex) {
-                window.botWorkingForIndex = serverState.currentPickIndex;
-                let botThinkingTime = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
-                setTimeout(() => { if (serverState.draftOrder[serverState.currentPickIndex] === activeUid && !isRevealing) makeAutoPick(activeUid); }, botThinkingTime);
+                picksEl.classList.add('hidden');
             }
         }
     }
 
-    function renderTabs() {
-        const div = document.getElementById('team-tabs'); div.innerHTML = '';
-        for(let uid in serverState.users) {
-            const u = serverState.users[uid];
-            const b = document.createElement('button');
-            b.className = `px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${u.id === viewingUserId ? 'bg-blue-600 text-white' : 'bg-white/10 text-gray-400 hover:bg-white/20'}`;
-            b.innerText = u.teamName; 
-            b.onclick = () => { viewingUserId = u.id; fillPitchData(serverState.users[viewingUserId].team, "slot"); renderTabs(); };
-            div.appendChild(b);
+    renderTabs();
+    const userToView = serverState.users[viewingUserId] || serverState.users[myUserId];
+    fillPitchData(userToView.team, "slot");
+    updateAdvisor();
+    renderPlayers();
+
+    if(isHost && activeUser.isBot && !isRevealing) {
+        if(window.botWorkingForIndex !== serverState.currentPickIndex) {
+            window.botWorkingForIndex = serverState.currentPickIndex;
+            let botThinkingTime = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
+            setTimeout(() => { if (serverState.draftOrder[serverState.currentPickIndex] === activeUid && !isRevealing) makeAutoPick(activeUid); }, botThinkingTime);
         }
     }
+}
 
-    function fillPitchData(team, prefix) {
-        team = team || {}; 
-        const slots = ['POR', 'LD', 'DFC1', 'DFC2', 'LI', 'MC1', 'MC2', 'MC3', 'ED', 'EI', 'DC', 'SUB1', 'SUB2', 'SUB3', 'SUB4', 'SUB5'];
-        slots.forEach(slot => {
-            const el = document.getElementById(`${prefix}-${slot}`);
-            if(!el) return;
-            
-            let isSub = slot.startsWith('SUB');
-            el.className = isSub ? 'player-card !w-[18%] !h-[70px]' : 'player-card'; 
-            
-            if (team[slot] && team[slot].id) { 
-                el.classList.add('filled');
-                let ratSize = isSub ? 'text-[10px]' : 'text-xs';
-                el.innerHTML = `<span class="font-bold text-yellow-300 ${ratSize} mb-0.5">${team[slot].rat}</span><span class="font-bold truncate w-full px-1 ${isSub ? 'text-[9px]' : ''}">${team[slot].name}</span>`;
-            } else {
-                let defaultText = slot.replace(/[0-9]/g, ''); 
-                el.innerHTML = `<span class="text-gray-400 text-[10px] font-bold">${defaultText}</span>`;
-            }
-        });
+function renderTabs() {
+    const div = document.getElementById('team-tabs'); div.innerHTML = '';
+    for(let uid in serverState.users) {
+        const u = serverState.users[uid];
+        const b = document.createElement('button');
+        b.className = `px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${u.id === viewingUserId ? 'bg-blue-600 text-white' : 'bg-white/10 text-gray-400 hover:bg-white/20'}`;
+        b.innerText = u.teamName; 
+        b.onclick = () => { viewingUserId = u.id; fillPitchData(serverState.users[viewingUserId].team, "slot"); renderTabs(); };
+        div.appendChild(b);
     }
+}
 
-    function togglePosFilter(pos) { const idx = activePosFilters.indexOf(pos); if(idx > -1) activePosFilters.splice(idx, 1); else activePosFilters.push(pos); document.querySelectorAll('.pos-pill').forEach(pill => { if(activePosFilters.includes(pill.innerText)) pill.classList.add('active'); else pill.classList.remove('active'); }); renderPlayers(); }
-    function clearPosFilters() { activePosFilters = []; document.querySelectorAll('.pos-pill').forEach(pill => pill.classList.remove('active')); renderPlayers(); }
+function fillPitchData(team, prefix) {
+    team = team || {}; 
+    const slots = ['POR', 'LD', 'DFC1', 'DFC2', 'LI', 'MC1', 'MC2', 'MC3', 'ED', 'EI', 'DC', 'SUB1', 'SUB2', 'SUB3', 'SUB4', 'SUB5'];
+    slots.forEach(slot => {
+        const el = document.getElementById(`${prefix}-${slot}`);
+        if(!el) return;
+
+        let isSub = slot.startsWith('SUB');
+        el.className = isSub ? 'player-card !w-[18%] !h-[70px]' : 'player-card'; 
+
+        if (team[slot] && team[slot].id) { 
+            el.classList.add('filled');
+            let ratSize = isSub ? 'text-[10px]' : 'text-xs';
+            el.innerHTML = `<span class="font-bold text-yellow-300 ${ratSize} mb-0.5">${team[slot].rat}</span><span class="font-bold truncate w-full px-1 ${isSub ? 'text-[9px]' : ''}">${team[slot].name}</span>`;
+        } else {
+            let defaultText = slot.replace(/[0-9]/g, ''); 
+            el.innerHTML = `<span class="text-gray-400 text-[10px] font-bold">${defaultText}</span>`;
+        }
+    });
+}
+
+function togglePosFilter(pos) { const idx = activePosFilters.indexOf(pos); if(idx > -1) activePosFilters.splice(idx, 1); else activePosFilters.push(pos); document.querySelectorAll('.pos-pill').forEach(pill => { if(activePosFilters.includes(pill.innerText)) pill.classList.add('active'); else pill.classList.remove('active'); }); renderPlayers(); }
+function clearPosFilters() { activePosFilters = []; document.querySelectorAll('.pos-pill').forEach(pill => pill.classList.remove('active')); renderPlayers(); }
 
     // Lista filtrada actual y offset para lazy-load
-    let _playerListFiltered = [];
-    let _playerListOffset   = 0;
+let _playerListFiltered = [];
+let _playerListOffset   = 0;
     const PLAYER_BATCH      = 60; // jugadores por tanda
 
     function _buildPlayerRow(player, isMyTurn, sortBy) {
@@ -1078,8 +1145,8 @@ _prevActiveUid = activeUid;
         div.className = `flex justify-between items-center p-2.5 rounded-lg border transition ${
             isPending  ? 'bg-yellow-500/20 border-yellow-500' :
             hasFit     ? 'bg-white/5 border-white/10 hover:border-purple-500/40' :
-                         'bg-white/5 border-white/10 hover:bg-white/8'}`;
-        div.innerHTML = `
+            'bg-white/5 border-white/10 hover:bg-white/8'}`;
+            div.innerHTML = `
             <div class="flex items-center gap-2.5 flex-1 overflow-hidden">
                 <div class="flex flex-col items-center flex-shrink-0 w-10">
                     <div class="bg-black/50 text-yellow-400 font-bold rounded p-1 text-sm w-full text-center border border-white/10">${player.rat}</div>
@@ -1088,7 +1155,7 @@ _prevActiveUid = activeUid;
                 <div class="flex flex-col flex-1 min-w-0">
                     <div class="flex items-center gap-1.5">
                         <div class="font-bold text-sm truncate text-white leading-tight">${player.name}</div>
-                        ${hasFit && isMyTurn ? `<span class="flex-shrink-0 text-[7px] font-black bg-purple-900/60 border border-purple-500/40 text-purple-300 px-1 py-0.5 rounded leading-none">✓ ${fitText}</span>` : ''}
+                ${hasFit && isMyTurn ? `<span class="flex-shrink-0 text-[7px] font-black bg-purple-900/60 border border-purple-500/40 text-purple-300 px-1 py-0.5 rounded leading-none">✓ ${fitText}</span>` : ''}
                     </div>
                     <div class="flex gap-1 mt-0.5 text-[8px] text-gray-400 flex-wrap">
                         <span class="stat-badge ${sortBy==='pac'?'border-yellow-500 text-yellow-200':''}">PAC <b>${player.pac}</b></span>
@@ -1103,69 +1170,69 @@ _prevActiveUid = activeUid;
                 class="${isPending ? 'bg-yellow-600' : 'glass-button'} text-white px-2.5 py-1.5 rounded font-bold text-xs flex-shrink-0">
                 ${isPending ? 'Colocar' : 'Fichar'}
             </button>`;
-        return div;
-    }
+            return div;
+        }
 
-    function _appendPlayerBatch(listDiv, isMyTurn, sortBy) {
-        const batch = _playerListFiltered.slice(_playerListOffset, _playerListOffset + PLAYER_BATCH);
-        if (batch.length === 0) return;
+        function _appendPlayerBatch(listDiv, isMyTurn, sortBy) {
+            const batch = _playerListFiltered.slice(_playerListOffset, _playerListOffset + PLAYER_BATCH);
+            if (batch.length === 0) return;
 
-        const frag = document.createDocumentFragment();
-        batch.forEach(p => frag.appendChild(_buildPlayerRow(p, isMyTurn, sortBy)));
-        _playerListOffset += batch.length;
+            const frag = document.createDocumentFragment();
+            batch.forEach(p => frag.appendChild(_buildPlayerRow(p, isMyTurn, sortBy)));
+            _playerListOffset += batch.length;
 
         // Sentinel para disparar siguiente tanda al hacer scroll
-        if (_playerListOffset < _playerListFiltered.length) {
-            const sentinel = document.createElement('div');
-            sentinel.className = 'h-6 flex items-center justify-center';
-            sentinel.innerHTML = `<span class="text-[10px] text-gray-600">↓ ${_playerListFiltered.length - _playerListOffset} más</span>`;
-            frag.appendChild(sentinel);
+            if (_playerListOffset < _playerListFiltered.length) {
+                const sentinel = document.createElement('div');
+                sentinel.className = 'h-6 flex items-center justify-center';
+                sentinel.innerHTML = `<span class="text-[10px] text-gray-600">↓ ${_playerListFiltered.length - _playerListOffset} más</span>`;
+                frag.appendChild(sentinel);
 
-            const obs = new IntersectionObserver(entries => {
-                if (!entries[0].isIntersecting) return;
-                obs.disconnect();
-                sentinel.remove();
-                _appendPlayerBatch(listDiv, isMyTurn, sortBy);
-            }, { root: listDiv, rootMargin: '100px' });
+                const obs = new IntersectionObserver(entries => {
+                    if (!entries[0].isIntersecting) return;
+                    obs.disconnect();
+                    sentinel.remove();
+                    _appendPlayerBatch(listDiv, isMyTurn, sortBy);
+                }, { root: listDiv, rootMargin: '100px' });
 
             // Append first, then observe
-            listDiv.appendChild(frag);
-            obs.observe(sentinel);
-        } else {
-            listDiv.appendChild(frag);
+                listDiv.appendChild(frag);
+                obs.observe(sentinel);
+            } else {
+                listDiv.appendChild(frag);
+            }
         }
-    }
 
-    function renderPlayers() {
-        const listDiv = document.getElementById('players-list');
-        if (!listDiv) return;
-        const searchTerm = document.getElementById('search-input').value.toLowerCase();
-        const sortBy     = document.getElementById('sort-filter').value;
-        const isMyTurn   = serverState.draftOrder[serverState.currentPickIndex] === myUserId && !isRevealing;
+        function renderPlayers() {
+            const listDiv = document.getElementById('players-list');
+            if (!listDiv) return;
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const sortBy     = document.getElementById('sort-filter').value;
+            const isMyTurn   = serverState.draftOrder[serverState.currentPickIndex] === myUserId && !isRevealing;
 
-        _playerListFiltered = availablePlayers
+            _playerListFiltered = availablePlayers
             .filter(p => !localTakenPlayers[p.id] &&
                 p.name.toLowerCase().includes(searchTerm) &&
                 (activePosFilters.length === 0 || activePosFilters.some(f => p.pos.includes(f))))
             .sort((a, b) => b[sortBy] - a[sortBy]);
 
-        _playerListOffset = 0;
-        listDiv.innerHTML = '';
-        _appendPlayerBatch(listDiv, isMyTurn, sortBy);
-    }
+            _playerListOffset = 0;
+            listDiv.innerHTML = '';
+            _appendPlayerBatch(listDiv, isMyTurn, sortBy);
+        }
 
     // ==========================================
     // WAR ROOM (ASESOR DE IA MEJORADO) Y DRAFT GRADE
     // ==========================================
 
     // ── SCOUT PERSONAS ────────────────────────────────────────────
-    const SCOUTS = [
-        { name: "Roberto Leal",   role: "Director Técnico",  icon: "fa-briefcase",  color: "text-amber-400"  },
-        { name: "Carlos Moya",    role: "Jefe de Ojeadores", icon: "fa-binoculars", color: "text-blue-400"   },
-        { name: "Iván Zubieta",   role: "Analista Táctico",  icon: "fa-chart-bar",  color: "text-green-400"  },
-        { name: "Luis Fernández", role: "Scout Europa",      icon: "fa-map",        color: "text-purple-400" },
-        { name: "Paco Jiménez",   role: "Scout de Mercado",  icon: "fa-handshake",  color: "text-cyan-400"   },
-    ];
+        const SCOUTS = [
+            { name: "Roberto Leal",   role: "Director Técnico",  icon: "fa-briefcase",  color: "text-amber-400"  },
+            { name: "Carlos Moya",    role: "Jefe de Ojeadores", icon: "fa-binoculars", color: "text-blue-400"   },
+            { name: "Iván Zubieta",   role: "Analista Táctico",  icon: "fa-chart-bar",  color: "text-green-400"  },
+            { name: "Luis Fernández", role: "Scout Europa",      icon: "fa-map",        color: "text-purple-400" },
+            { name: "Paco Jiménez",   role: "Scout de Mercado",  icon: "fa-handshake",  color: "text-cyan-400"   },
+        ];
 
     // ──────────────────────────────────────────────────────────────
     //  MOTOR DE SCOUTING v2 — ESTRATEGIA PRIMERO
@@ -1181,7 +1248,7 @@ _prevActiveUid = activeUid;
     //    8. 🔄 BANQUILLO             — posición ya cubierta
     // ──────────────────────────────────────────────────────────────
 
-    function getDraftContextCaches(targetUserId) {
+        function getDraftContextCaches(targetUserId) {
         let oppNeeds = {}; // pos → Nº equipos rivales ÚNICOS que la necesitan
         let topAvail = {};
 
@@ -1199,7 +1266,7 @@ _prevActiveUid = activeUid;
         availablePlayers.forEach(ap => {
             if (!localTakenPlayers[ap.id] && ap.rat >= 84) {
                 ap.pos.split(',').map(s => s.trim().toUpperCase())
-                    .forEach(p => { topAvail[p] = (topAvail[p] || 0) + 1; });
+                .forEach(p => { topAvail[p] = (topAvail[p] || 0) + 1; });
             }
         });
 
@@ -1238,29 +1305,29 @@ _prevActiveUid = activeUid;
 
     // VOR: diferencial vs los 4 siguientes disponibles en su posición
     function _calcVOR(player) {
-    const pPosArray = player.pos.split(',').map(s => s.trim().toUpperCase());
-    const seen = new Set([player.id]);
-    const replacements = [];
+        const pPosArray = player.pos.split(',').map(s => s.trim().toUpperCase());
+        const seen = new Set([player.id]);
+        const replacements = [];
 
     // Busca en los buckets ya indexados — O(pocos) en vez de O(16.000)
-    for (const pos of pPosArray) {
-        let found = 0;
-        for (const p of (_posBuckets[pos] || [])) {
-            if (seen.has(p.id) || localTakenPlayers[p.id]) continue;
-            seen.add(p.id);
-            replacements.push(p);
-            if (++found >= 4) break;
+        for (const pos of pPosArray) {
+            let found = 0;
+            for (const p of (_posBuckets[pos] || [])) {
+                if (seen.has(p.id) || localTakenPlayers[p.id]) continue;
+                seen.add(p.id);
+                replacements.push(p);
+                if (++found >= 4) break;
+            }
+            if (replacements.length >= 4) break;
         }
-        if (replacements.length >= 4) break;
+
+        if (replacements.length === 0) return { vor: 15, nextBest: null, isLastElite: true };
+
+        replacements.sort((a, b) => b.rat - a.rat);
+        const top4 = replacements.slice(0, 4);
+        const avg = top4.reduce((s, p) => s + p.rat, 0) / top4.length;
+        return { vor: player.rat - avg, nextBest: top4[0], isLastElite: top4[0].rat < 84 };
     }
-
-    if (replacements.length === 0) return { vor: 15, nextBest: null, isLastElite: true };
-
-    replacements.sort((a, b) => b.rat - a.rat);
-    const top4 = replacements.slice(0, 4);
-    const avg = top4.reduce((s, p) => s + p.rat, 0) / top4.length;
-    return { vor: player.rat - avg, nextBest: top4[0], isLastElite: top4[0].rat < 84 };
-}
 
     // VOR global: diferencial de este jugador respecto al mejor disponible en CUALQUIER posición
     // Devuelve true si es claramente el mejor pick del draft
@@ -1442,18 +1509,18 @@ _prevActiveUid = activeUid;
             const starters = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'];
             const unique  = [...new Set(starters.filter(s => !myTeam[s]||!myTeam[s].id).map(s => s.replace(/\d/g,'')))];
             needsDiv.innerHTML = unique.length === 0
-                ? `<span class="text-green-400 font-bold">✅ 11 titular completo</span><span class="text-gray-400 ml-2">— Busca suplentes de calidad.</span>`
-                : `<span class="text-gray-400 text-[10px] uppercase font-bold mr-2">Carencias:</span>` +
-                  unique.map(p => `<span class="inline-block bg-red-900/40 border border-red-600/50 text-red-300 text-[10px] font-bold px-1.5 py-0.5 rounded mr-1">${p}</span>`).join('');
+            ? `<span class="text-green-400 font-bold">✅ 11 titular completo</span><span class="text-gray-400 ml-2">— Busca suplentes de calidad.</span>`
+            : `<span class="text-gray-400 text-[10px] uppercase font-bold mr-2">Carencias:</span>` +
+            unique.map(p => `<span class="inline-block bg-red-900/40 border border-red-600/50 text-red-300 text-[10px] font-bold px-1.5 py-0.5 rounded mr-1">${p}</span>`).join('');
         }
 
         // Scoring
         const caches = getDraftContextCaches(myUserId);
         const scored = availablePlayers
-            .filter(p => !localTakenPlayers[p.id])
-            .slice(0, 300)
-            .map(p => ({ player: p, ..._scorePlayerFull(p, myUserId, caches) }))
-            .sort((a, b) => b.score - a.score);
+        .filter(p => !localTakenPlayers[p.id])
+        .slice(0, 300)
+        .map(p => ({ player: p, ..._scorePlayerFull(p, myUserId, caches) }))
+        .sort((a, b) => b.score - a.score);
 
         // Diversificamos: slot category, titulares primero
         const finalRecs    = [];
@@ -1492,8 +1559,8 @@ _prevActiveUid = activeUid;
             const p     = item.player;
             const scout = SCOUTS[i] || SCOUTS[SCOUTS.length - 1];
             const slotText = item.compatibleSlots.length > 0
-                ? [...new Set(item.compatibleSlots.map(s => s.replace(/\d/g,'')))] .join(' / ')
-                : 'Banquillo';
+            ? [...new Set(item.compatibleSlots.map(s => s.replace(/\d/g,'')))] .join(' / ')
+            : 'Banquillo';
 
             // Barra VOR
             const vorClamped = Math.min(Math.max(item.vor, -5), 12);
@@ -1503,8 +1570,8 @@ _prevActiveUid = activeUid;
 
             // Contexto de rivales (mini badge)
             const rivalBadge = item.opponentsNeeding > 0 && item.isStarterNeeded
-                ? `<span class="inline-block text-[8px] font-bold bg-red-900/40 border border-red-700/50 text-red-300 px-1.5 py-0.5 rounded-full ml-1">${item.opponentsNeeding}/${item.numRivals} rivales</span>`
-                : '';
+            ? `<span class="inline-block text-[8px] font-bold bg-red-900/40 border border-red-700/50 text-red-300 px-1.5 py-0.5 rounded-full ml-1">${item.opponentsNeeding}/${item.numRivals} rivales</span>`
+            : '';
 
             warDiv.innerHTML += `
                 <div class="border rounded-xl overflow-hidden transition hover:brightness-110 ${item.urgencyBg}">
@@ -1540,19 +1607,19 @@ _prevActiveUid = activeUid;
                             <div class="text-[9px] text-purple-300 flex items-center gap-1">
                                 <i class="fas fa-location-dot text-[8px]"></i>
                                 <span class="font-bold">${slotText}</span>
-                                ${item.topAvailable > 0 ? `<span class="text-gray-600">· ${item.topAvailable} élite disp.</span>` : ''}
+                ${item.topAvailable > 0 ? `<span class="text-gray-600">· ${item.topAvailable} élite disp.</span>` : ''}
                             </div>
-                            ${canPick ? `<button onclick="startPlacementDraft('${p.id}'); switchRightTab('agencia');" class="bg-blue-700 hover:bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-lg shadow transition">FICHAR</button>` : ''}
+                ${canPick ? `<button onclick="startPlacementDraft('${p.id}'); switchRightTab('agencia');" class="bg-blue-700 hover:bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-lg shadow transition">FICHAR</button>` : ''}
                         </div>
                     </div>
-                </div>`;
+            </div>`;
         });
 
-        if (finalRecs.length === 0)
-            warDiv.innerHTML = `<div class="text-center text-gray-500 text-sm mt-6 italic">El departamento de scouting no tiene informes disponibles.</div>`;
-    }
+if (finalRecs.length === 0)
+    warDiv.innerHTML = `<div class="text-center text-gray-500 text-sm mt-6 italic">El departamento de scouting no tiene informes disponibles.</div>`;
+}
 
-    function getGrade(player, userId) {
+function getGrade(player, userId) {
     userId = userId || myUserId;
 
     // Posiciones que aún necesita el equipo (O(slots), barato)
@@ -1595,83 +1662,83 @@ _prevActiveUid = activeUid;
     // ==========================================
     // CONFIRMACIÓN DE PICKS Y REVELACIÓN
     // ==========================================
-    function highlightCompatibleSlots(player) {
-        const compatible = getCompatibleSlotsForPlayer(player, myUserId);
-        const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5'];
-        allSlots.forEach(slot => {
-            const el = document.getElementById(`slot-${slot}`);
-            if (!el || el.classList.contains('filled')) return;
-            if (compatible.includes(slot) || slot.startsWith('SUB')) {
-                el.classList.add('compatible-slot');
-            }
-        });
-    }
+function highlightCompatibleSlots(player) {
+    const compatible = getCompatibleSlotsForPlayer(player, myUserId);
+    const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5'];
+    allSlots.forEach(slot => {
+        const el = document.getElementById(`slot-${slot}`);
+        if (!el || el.classList.contains('filled')) return;
+        if (compatible.includes(slot) || slot.startsWith('SUB')) {
+            el.classList.add('compatible-slot');
+        }
+    });
+}
 
-    function clearCompatibleHighlights() {
-        document.querySelectorAll('.compatible-slot').forEach(e => e.classList.remove('compatible-slot'));
-    }
+function clearCompatibleHighlights() {
+    document.querySelectorAll('.compatible-slot').forEach(e => e.classList.remove('compatible-slot'));
+}
 
-    function startPlacementDraft(playerId) {
-        if (isRevealing) return;
-        pendingPlayer = availablePlayers.find(p => p.id === playerId);
-        if (!pendingPlayer) return;
-        document.getElementById('pitch-container').classList.add('highlight-slots');
-        document.getElementById('placement-name').innerText = pendingPlayer.name;
-        document.getElementById('placement-banner').classList.remove('hidden');
-        document.getElementById('confirm-banner').classList.add('hidden');
-        if (viewingUserId !== myUserId) { viewingUserId = myUserId; fillPitchData(serverState.users[myUserId].team, "slot"); renderTabs(); }
-        clearCompatibleHighlights();
-        highlightCompatibleSlots(pendingPlayer);
-        renderPlayers();
-    }
+function startPlacementDraft(playerId) {
+    if (isRevealing) return;
+    pendingPlayer = availablePlayers.find(p => p.id === playerId);
+    if (!pendingPlayer) return;
+    document.getElementById('pitch-container').classList.add('highlight-slots');
+    document.getElementById('placement-name').innerText = pendingPlayer.name;
+    document.getElementById('placement-banner').classList.remove('hidden');
+    document.getElementById('confirm-banner').classList.add('hidden');
+    if (viewingUserId !== myUserId) { viewingUserId = myUserId; fillPitchData(serverState.users[myUserId].team, "slot"); renderTabs(); }
+    clearCompatibleHighlights();
+    highlightCompatibleSlots(pendingPlayer);
+    renderPlayers();
+}
 
-    function cancelPlacement() {
-        pendingPlayer = null; pendingSlot = null;
-        document.getElementById('pitch-container').classList.remove('highlight-slots');
-        document.getElementById('placement-banner').classList.add('hidden');
-        document.getElementById('confirm-banner').classList.add('hidden');
-        clearCompatibleHighlights();
-        document.querySelectorAll('.selected-slot').forEach(e => e.classList.remove('selected-slot'));
-        renderPlayers();
-    }
+function cancelPlacement() {
+    pendingPlayer = null; pendingSlot = null;
+    document.getElementById('pitch-container').classList.remove('highlight-slots');
+    document.getElementById('placement-banner').classList.add('hidden');
+    document.getElementById('confirm-banner').classList.add('hidden');
+    clearCompatibleHighlights();
+    document.querySelectorAll('.selected-slot').forEach(e => e.classList.remove('selected-slot'));
+    renderPlayers();
+}
 
-    function selectPitchSlot(prefix, slotId) {
-        if(prefix !== "slot" || !pendingPlayer || serverState.draftOrder[serverState.currentPickIndex] !== myUserId || viewingUserId !== myUserId) return;
-        const team = serverState.users[myUserId].team || {}; 
-        if(team[slotId] && team[slotId].id) return alert("Ese hueco ya está ocupado.");
-        
+function selectPitchSlot(prefix, slotId) {
+    if(prefix !== "slot" || !pendingPlayer || serverState.draftOrder[serverState.currentPickIndex] !== myUserId || viewingUserId !== myUserId) return;
+    const team = serverState.users[myUserId].team || {}; 
+    if(team[slotId] && team[slotId].id) return alert("Ese hueco ya está ocupado.");
+
         // Quitar highlight anterior si lo había y marcar el nuevo
-        document.querySelectorAll('.selected-slot').forEach(e => e.classList.remove('selected-slot'));
-        document.getElementById(`${prefix}-${slotId}`).classList.add('selected-slot');
+    document.querySelectorAll('.selected-slot').forEach(e => e.classList.remove('selected-slot'));
+    document.getElementById(`${prefix}-${slotId}`).classList.add('selected-slot');
 
-        pendingSlot = slotId;
-        document.getElementById('placement-banner').classList.add('hidden');
-        const cb = document.getElementById('confirm-banner');
-        cb.classList.remove('hidden');
-        document.getElementById('confirm-name').innerText = pendingPlayer.name;
-        document.getElementById('confirm-pos').innerText = slotId.replace(/[0-9]/g, '');
-        
-        document.getElementById('btn-confirm-pick').onclick = () => {
-            pushDraftPickToFirebase(pendingPlayer, pendingSlot, myUserId);
-        };
-    }
+    pendingSlot = slotId;
+    document.getElementById('placement-banner').classList.add('hidden');
+    const cb = document.getElementById('confirm-banner');
+    cb.classList.remove('hidden');
+    document.getElementById('confirm-name').innerText = pendingPlayer.name;
+    document.getElementById('confirm-pos').innerText = slotId.replace(/[0-9]/g, '');
 
-    function pushDraftPickToFirebase(player, slotId, userId) {
-        let updates = {};
-        updates[`users/${userId}/team/${slotId}`] = player;
-        updates[`takenPlayers/${player.id}`] = true;
-        
-        let gradeInfo = getGrade(player, userId);
-        updates[`reveal`] = { player: player, slotId: slotId, userId: userId, pickNum: serverState.currentPickIndex + 1, ts: Date.now(), grade: gradeInfo.grade, gradeClass: gradeInfo.class };
+    document.getElementById('btn-confirm-pick').onclick = () => {
+        pushDraftPickToFirebase(pendingPlayer, pendingSlot, myUserId);
+    };
+}
 
-        pendingPlayer = null; pendingSlot = null;
-        document.getElementById('pitch-container').classList.remove('highlight-slots');
-        document.querySelectorAll('.selected-slot').forEach(e => e.classList.remove('selected-slot'));
-        document.getElementById('confirm-banner').classList.add('hidden');
-        clearCompatibleHighlights();
+function pushDraftPickToFirebase(player, slotId, userId) {
+    let updates = {};
+    updates[`users/${userId}/team/${slotId}`] = player;
+    updates[`takenPlayers/${player.id}`] = true;
+
+    let gradeInfo = getGrade(player, userId);
+    updates[`reveal`] = { player: player, slotId: slotId, userId: userId, pickNum: serverState.currentPickIndex + 1, ts: Date.now(), grade: gradeInfo.grade, gradeClass: gradeInfo.class };
+
+    pendingPlayer = null; pendingSlot = null;
+    document.getElementById('pitch-container').classList.remove('highlight-slots');
+    document.querySelectorAll('.selected-slot').forEach(e => e.classList.remove('selected-slot'));
+    document.getElementById('confirm-banner').classList.add('hidden');
+    clearCompatibleHighlights();
 
         // AQUÍ DISPARAMOS LA NOTICIA AL TICKER CUANDO ALGUIEN FICHA
-        const teamName = serverState.users[userId].teamName;
+    const teamName = serverState.users[userId].teamName;
         const formattedSlot = slotId.replace(/[0-9]/g, ''); // MC1 -> MC
         pushNews(`El mánager de ${teamName} selecciona a ${player.name} (${player.rat}) en la posición de ${formattedSlot}. Nota de Ojeador: ${gradeInfo.grade}`);
 
@@ -1730,80 +1797,80 @@ _prevActiveUid = activeUid;
     // ==========================================
 
     function getBenchNeeds(team) {
-    const subSlots = ['SUB1','SUB2','SUB3','SUB4','SUB5'];
-    const hasSub = (posList) => subSlots.some(s => team[s]?.id &&
-        team[s].pos?.split(',').map(x => x.trim().toUpperCase()).some(p => posList.includes(p)));
-    const needs = [];
-    if (!hasSub(['GK']))                              needs.push(['GK']);
-    if (!hasSub(['CB','LB','RB','LWB','RWB']))        needs.push(['CB','LB','RB','LWB','RWB']);
-    if (!hasSub(['CM','CDM','CAM','LM','RM']))         needs.push(['CM','CDM','CAM','LM','RM']);
-    if (!hasSub(['ST','CF','LW','RW']))                needs.push(['ST','CF','LW','RW']);
-    needs.push(['GK','CB','LB','RB','CM','CDM','CAM','ST','CF','LW','RW','LM','RM','LWB','RWB']);
-    return needs;
-}
+        const subSlots = ['SUB1','SUB2','SUB3','SUB4','SUB5'];
+        const hasSub = (posList) => subSlots.some(s => team[s]?.id &&
+            team[s].pos?.split(',').map(x => x.trim().toUpperCase()).some(p => posList.includes(p)));
+        const needs = [];
+        if (!hasSub(['GK']))                              needs.push(['GK']);
+        if (!hasSub(['CB','LB','RB','LWB','RWB']))        needs.push(['CB','LB','RB','LWB','RWB']);
+        if (!hasSub(['CM','CDM','CAM','LM','RM']))         needs.push(['CM','CDM','CAM','LM','RM']);
+        if (!hasSub(['ST','CF','LW','RW']))                needs.push(['ST','CF','LW','RW']);
+        needs.push(['GK','CB','LB','RB','CM','CDM','CAM','ST','CF','LW','RW','LM','RM','LWB','RWB']);
+        return needs;
+    }
 
 
     function makeAutoPick(uId) {
-    const u = serverState.users[uId];
-    const team = u.team || {};
-    const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5'];
+        const u = serverState.users[uId];
+        const team = u.team || {};
+        const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5'];
 
-    let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
-    let caches = getDraftContextCaches(uId);
-    let scoredPlayers = unpickedPlayers.slice(0, 300)
+        let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
+        let caches = getDraftContextCaches(uId);
+        let scoredPlayers = unpickedPlayers.slice(0, 300)
         .map(p => ({ p, score: calculatePlayerScore(p, uId, caches) }))
         .sort((a, b) => b.score - a.score);
 
-    let chosenSlot = null, chosenPlayer = null;
+        let chosenSlot = null, chosenPlayer = null;
 
     // ── Titulares vacíos: elige por urgencia (escasez + calidad) ──
-    const emptyStarters = allSlots.filter(s => !s.startsWith('SUB') && (!team[s] || !team[s].id));
-    if (emptyStarters.length > 0) {
-        let slotCandidates = [];
-        for (const s of emptyStarters) {
-            const best = scoredPlayers.find(item => {
-                if (botPosRules[s].includes('ANY')) return true;
-                return item.p.pos.split(',').map(x => x.trim().toUpperCase()).some(p => botPosRules[s].includes(p));
-            });
-            if (!best) continue;
-            const eliteLeft = unpickedPlayers.filter(p => {
-                if (p.rat < 84) return false;
-                if (botPosRules[s].includes('ANY')) return true;
-                return p.pos.split(',').map(x => x.trim().toUpperCase()).some(pos => botPosRules[s].includes(pos));
-            }).length;
-            const urgency = best.score + (eliteLeft <= 2 ? 2000 : eliteLeft <= 5 ? 800 : 0);
-            slotCandidates.push({ slot: s, player: best.p, urgency });
+        const emptyStarters = allSlots.filter(s => !s.startsWith('SUB') && (!team[s] || !team[s].id));
+        if (emptyStarters.length > 0) {
+            let slotCandidates = [];
+            for (const s of emptyStarters) {
+                const best = scoredPlayers.find(item => {
+                    if (botPosRules[s].includes('ANY')) return true;
+                    return item.p.pos.split(',').map(x => x.trim().toUpperCase()).some(p => botPosRules[s].includes(p));
+                });
+                if (!best) continue;
+                const eliteLeft = unpickedPlayers.filter(p => {
+                    if (p.rat < 84) return false;
+                    if (botPosRules[s].includes('ANY')) return true;
+                    return p.pos.split(',').map(x => x.trim().toUpperCase()).some(pos => botPosRules[s].includes(pos));
+                }).length;
+                const urgency = best.score + (eliteLeft <= 2 ? 2000 : eliteLeft <= 5 ? 800 : 0);
+                slotCandidates.push({ slot: s, player: best.p, urgency });
+            }
+            if (slotCandidates.length > 0) {
+                slotCandidates.sort((a, b) => b.urgency - a.urgency);
+                chosenSlot = slotCandidates[0].slot;
+                chosenPlayer = slotCandidates[0].player;
+            }
         }
-        if (slotCandidates.length > 0) {
-            slotCandidates.sort((a, b) => b.urgency - a.urgency);
-            chosenSlot = slotCandidates[0].slot;
-            chosenPlayer = slotCandidates[0].player;
-        }
-    }
 
     // ── Banquillo: cubre necesidades equilibradas ──
-    if (!chosenPlayer) {
-        const benchSlots = allSlots.filter(s => s.startsWith('SUB') && (!team[s] || !team[s].id));
-        if (benchSlots.length > 0) {
-            const benchNeeds = getBenchNeeds(team);
-            for (const need of benchNeeds) {
-                const candidate = unpickedPlayers.find(p =>
-                    p.pos.split(',').map(x => x.trim().toUpperCase()).some(pos => need.includes(pos)));
-                if (candidate) { chosenSlot = benchSlots[0]; chosenPlayer = candidate; break; }
-            }
-            if (!chosenPlayer && unpickedPlayers.length > 0) {
-                chosenSlot = benchSlots[0];
-                chosenPlayer = scoredPlayers[0]?.p || unpickedPlayers[0];
+        if (!chosenPlayer) {
+            const benchSlots = allSlots.filter(s => s.startsWith('SUB') && (!team[s] || !team[s].id));
+            if (benchSlots.length > 0) {
+                const benchNeeds = getBenchNeeds(team);
+                for (const need of benchNeeds) {
+                    const candidate = unpickedPlayers.find(p =>
+                        p.pos.split(',').map(x => x.trim().toUpperCase()).some(pos => need.includes(pos)));
+                    if (candidate) { chosenSlot = benchSlots[0]; chosenPlayer = candidate; break; }
+                }
+                if (!chosenPlayer && unpickedPlayers.length > 0) {
+                    chosenSlot = benchSlots[0];
+                    chosenPlayer = scoredPlayers[0]?.p || unpickedPlayers[0];
+                }
             }
         }
-    }
 
-    if (!chosenSlot || !chosenPlayer) {
-        chosenSlot = allSlots.find(x => !team[x] || !team[x].id);
-        chosenPlayer = unpickedPlayers[0];
+        if (!chosenSlot || !chosenPlayer) {
+            chosenSlot = allSlots.find(x => !team[x] || !team[x].id);
+            chosenPlayer = unpickedPlayers[0];
+        }
+        if (chosenSlot && chosenPlayer) pushDraftPickToFirebase(chosenPlayer, chosenSlot, uId);
     }
-    if (chosenSlot && chosenPlayer) pushDraftPickToFirebase(chosenPlayer, chosenSlot, uId);
-}
 
     function startLocalTimerLoop() {
         if(localTimerInterval) clearInterval(localTimerInterval);
@@ -1894,6 +1961,153 @@ _prevActiveUid = activeUid;
             document.getElementById(`final-${i}`).innerHTML = getPitchHTML(`f-${i}`);
             fillPitchData(u.team, `f-${i}`);
         });
+    }
+
+    // ==========================================
+// CHAT PRIVADO
+// ==========================================
+    let _chatOpen       = false;
+    let _chatActiveUid  = null;
+    let _chatListeners  = {};
+    let _chatUnread     = {};
+    let _chatMessages   = {};
+
+    function _chatId(a, b) { return [a, b].sort().join('__'); }
+
+    function initChat() {
+        if (!roomRef || !serverState.users) return;
+        document.getElementById('chat-bubble-container').classList.remove('hidden');
+        Object.keys(serverState.users).forEach(uid => {
+            if (uid === myUserId || serverState.users[uid].isBot) return;
+            const cid = _chatId(myUserId, uid);
+            if (_chatListeners[cid]) return;
+            _chatListeners[cid] = db.ref('rooms/' + currentRoomId + '/dm/' + cid)
+            .on('value', snap => {
+                const d = snap.val() || {};
+                const msgs = Object.values(d.messages || {}).sort((a,b) => a.ts - b.ts);
+                _chatMessages[cid] = msgs;
+                const seen = d['seen_' + myUserId] || 0;
+                _chatUnread[cid] = msgs.filter(m => m.from !== myUserId && m.ts > seen).length;
+                _updateChatBadge();
+                if (_chatActiveUid === uid) { _renderMessages(cid); _markSeen(cid); }
+                else _renderContactList();
+            });
+        });
+        _renderContactList();
+    }
+
+    function _updateChatBadge() {
+        const total = Object.values(_chatUnread).reduce((s,n) => s+n, 0);
+        const badge = document.getElementById('chat-unread-badge');
+        if (!badge) return;
+        badge.innerText = total;
+        badge.classList.toggle('hidden', total === 0);
+        badge.classList.toggle('flex', total > 0);
+    }
+
+    function toggleChatPanel() {
+        _chatOpen = !_chatOpen;
+        const panel = document.getElementById('chat-panel');
+        if (_chatOpen) {
+            panel.classList.replace('chat-panel-hidden', 'chat-panel-visible');
+            _chatActiveUid = null;
+            _renderContactList();
+        } else {
+            panel.classList.replace('chat-panel-visible', 'chat-panel-hidden');
+        }
+    }
+
+    function _renderContactList() {
+        const listView = document.getElementById('chat-list-view');
+        const convView = document.getElementById('chat-conv-view');
+        if (!listView || !convView) return;
+        listView.classList.remove('hidden'); listView.classList.add('flex', 'flex-col');
+        convView.classList.add('hidden');   convView.classList.remove('flex');
+
+        const users = serverState.users || {};
+        let html = '';
+        Object.keys(users).forEach(uid => {
+            if (uid === myUserId || users[uid].isBot) return;
+            const u   = users[uid];
+            const cid = _chatId(myUserId, uid);
+            const unr = _chatUnread[cid] || 0;
+            const msgs = _chatMessages[cid] || [];
+            const last = msgs.length ? msgs[msgs.length-1] : null;
+            const preview = last ? (last.from === myUserId ? '✓ ' : '') + last.text : 'Sin mensajes aún';
+            html += `
+        <div onclick="chatOpen('${uid}')"
+             class="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all"
+             style="hover:background:rgba(255,255,255,0.08)"
+             onmouseover="this.style.background='rgba(255,255,255,0.07)'"
+             onmouseout="this.style.background='transparent'">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center font-black text-sm flex-shrink-0">
+                ${u.nick.charAt(0).toUpperCase()}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="font-bold text-sm text-white leading-tight">${u.nick}</div>
+                <div class="text-xs truncate mt-0.5" style="color:rgba(255,255,255,0.35)">${preview}</div>
+            </div>
+                ${unr > 0 ? `<span class="flex-shrink-0 w-5 h-5 bg-blue-500 rounded-full text-white text-[10px] font-black flex items-center justify-center">${unr}</span>` : ''}
+            </div>`;
+        });
+        listView.innerHTML = html || '<div class="text-center text-sm py-8" style="color:rgba(255,255,255,0.3)">No hay otros mánagers</div>';
+    }
+
+    function chatOpen(uid) {
+        _chatActiveUid = uid;
+        const u   = serverState.users[uid];
+        const cid = _chatId(myUserId, uid);
+        document.getElementById('chat-list-view').classList.add('hidden');
+        const conv = document.getElementById('chat-conv-view');
+        conv.classList.remove('hidden'); conv.classList.add('flex');
+        document.getElementById('chat-conv-title').innerText  = u.nick;
+        document.getElementById('chat-conv-avatar').innerText = u.nick.charAt(0).toUpperCase();
+        _renderMessages(cid);
+        _markSeen(cid);
+        setTimeout(() => document.getElementById('chat-input').focus(), 50);
+    }
+
+    function chatBackToList() { _chatActiveUid = null; _renderContactList(); }
+
+    function _renderMessages(cid) {
+        const div = document.getElementById('chat-messages-list');
+        if (!div) return;
+        const msgs = _chatMessages[cid] || [];
+        div.innerHTML = msgs.length === 0
+        ? '<div class="text-center text-xs py-6" style="color:rgba(255,255,255,0.25)">Inicio de la conversación 🤫</div>'
+        : msgs.map(m => {
+            const isMe = m.from === myUserId;
+            const time = new Date(m.ts).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+            return `<div class="flex ${isMe?'justify-end':'justify-start'} mb-1">
+                <div class="max-w-[78%]">
+                    <div class="px-3 py-2 text-sm text-white ${isMe?'chat-msg-me':'chat-msg-them'}">${m.text}</div>
+                    <div class="text-[9px] mt-0.5 ${isMe?'text-right':'text-left'}" style="color:rgba(255,255,255,0.25)">${time}</div>
+                </div>
+        </div>`;
+    }).join('');
+        div.scrollTop = div.scrollHeight;
+    }
+
+    function _markSeen(cid) {
+        _chatUnread[cid] = 0;
+        _updateChatBadge();
+        _renderContactList();
+        db.ref('rooms/' + currentRoomId + '/dm/' + cid + '/seen_' + myUserId).set(Date.now());
+    }
+
+    function chatSend() {
+        if (!_chatActiveUid) return;
+        const input = document.getElementById('chat-input');
+        const text  = input.value.trim();
+        if (!text) return;
+        db.ref('rooms/' + currentRoomId + '/dm/' + _chatId(myUserId, _chatActiveUid) + '/messages').push({
+            from: myUserId, text, ts: Date.now()
+        });
+        input.value = '';
+    }
+
+    function chatKeydown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatSend(); }
     }
 </script>
 </body>
