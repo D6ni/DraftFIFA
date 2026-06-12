@@ -1480,18 +1480,25 @@ let _playerListOffset   = 0;
         });
     }
 
-    // Calidad posicional ponderada por rol
+    // Calidad posicional: La Media (OVR) es el 90% del valor, los stats deciden los empates.
     function _positionalQuality(player) {
+        const r = player.rat;
+        // Multiplicador base alto para asegurar que un 91 siempre gane a un 90
+        let score = r * 100; 
+
         const pos = player.pos.split(',').map(s => s.trim().toUpperCase());
-        const { rat:r, pac, sho, pas, dri, def } = player;
-        if (pos.includes('GK'))                                    return r * 28;
-        if (pos.some(p => ['ST','CF'].includes(p)))                return r*12 + sho*4 + pac*2.5 + dri*2;
-        if (pos.some(p => ['LW','RW','LM','RM'].includes(p)))     return r*12 + pac*3.5 + dri*3 + sho*1.5;
-        if (pos.some(p => ['CAM'].includes(p)))                    return r*12 + dri*3 + pas*3 + sho*2;
-        if (pos.some(p => ['CM','CDM'].includes(p)))               return r*12 + pas*3 + def*2.5 + dri*2;
-        if (pos.some(p => ['LB','RB','LWB','RWB'].includes(p)))   return r*12 + def*3 + pac*2.5 + pas*1.5;
-        if (pos.some(p => ['CB'].includes(p)))                     return r*12 + def*4 + pac*2 + pas*1;
-        return r*14 + (pac+sho+pas+dri+def)/2;
+        const { pac, sho, pas, dri, def } = player;
+
+        // Añadimos un pequeño extra (máx ~200 pts) según los stats clave de su posición
+        if (pos.includes('GK'))                                   return score + 180; // Bonus fijo porque no tienen stats de campo
+        if (pos.some(p => ['ST','CF'].includes(p)))               return score + (sho * 1.5) + pac;
+        if (pos.some(p => ['LW','RW','LM','RM'].includes(p)))     return score + (pac * 1.5) + dri;
+        if (pos.some(p => ['CAM'].includes(p)))                   return score + (pas * 1.5) + dri;
+        if (pos.some(p => ['CM','CDM'].includes(p)))              return score + (pas * 1.5) + def;
+        if (pos.some(p => ['LB','RB','LWB','RWB'].includes(p)))   return score + (pac * 1.5) + def;
+        if (pos.some(p => ['CB'].includes(p)))                    return score + (def * 2.0);
+        
+        return score + (pac + sho + pas + dri + def) / 2;
     }
 
     // VOR: diferencial vs los 4 siguientes disponibles en su posición
@@ -2055,12 +2062,12 @@ function pushDraftPickToFirebase(player, slotId, userId) {
         // Multiplicamos la puntuación real por un valor entre 0.95 y 1.05. 
         // Así los bots valoran a los jugadores de forma ligeramente distinta y no son clones.
         let scoredPlayers = unpickedPlayers.slice(0, 300)
-            .map(p => {
-                let baseScore = calculatePlayerScore(p, uId, caches);
-                let randomFactor = 0.95 + (Math.random() * 0.10); 
-                return { p, score: baseScore * randomFactor };
-            })
-            .sort((a, b) => b.score - a.score);
+        .map(p => {
+            let baseScore = calculatePlayerScore(p, uId, caches);
+            let randomFactor = 0.95 + (Math.random() * 0.10); 
+            return { p, score: baseScore * randomFactor };
+        })
+        .sort((a, b) => b.score - a.score);
 
         let chosenSlot = null, chosenPlayer = null;
 
@@ -2097,7 +2104,7 @@ function pushDraftPickToFirebase(player, slotId, userId) {
                     // Buscar al jugador con mayor puntuación que cumpla la necesidad del banquillo
                     const candidateItem = scoredPlayers.find(item =>
                         item.p.pos.split(',').map(x => x.trim().toUpperCase()).some(pos => need.includes(pos))
-                    );
+                        );
                     
                     if (candidateItem) { 
                         chosenSlot = benchSlots[0]; 
