@@ -327,7 +327,7 @@ select option {
                     <div id="jumbo-pos" class="relative z-10 text-lg font-bold text-blue-300 mt-4 opacity-0 transition-opacity">en la posición de <span id="jumbo-pos-text" class="text-white underline">MC</span></div>
                 </div>
 
-                <div class="flex flex-col lg:flex-row gap-6 h-[720px]" id="play-area">
+                <div class="flex flex-col lg:flex-row gap-6 lg:h-[720px]" id="play-area">
                     <div class="w-full lg:w-7/12 flex flex-col gap-3">
                         <div class="glass p-2 flex gap-2 overflow-x-auto" id="team-tabs"></div>
 
@@ -346,7 +346,7 @@ select option {
                         <div class="glass flex-1 flex flex-col p-4" id="pitch-container"></div>
                     </div>
 
-                    <div class="w-full lg:w-5/12 glass flex flex-col overflow-hidden">
+                    <div class="w-full lg:w-5/12 glass flex flex-col overflow-hidden h-[600px] lg:h-auto">
                         <!-- Pestañas Agencia vs War Room -->
                         <div class="flex border-b border-white/10 bg-black/40">
                             <button onclick="switchRightTab('agencia')" id="tab-agencia" class="flex-1 py-3 font-bold text-blue-400 border-b-2 border-blue-400">
@@ -1839,14 +1839,26 @@ function startPlacementDraft(playerId) {
     if (isRevealing) return;
     pendingPlayer = availablePlayers.find(p => p.id === playerId);
     if (!pendingPlayer) return;
+    
     document.getElementById('pitch-container').classList.add('highlight-slots');
     document.getElementById('placement-name').innerText = pendingPlayer.name;
     document.getElementById('placement-banner').classList.remove('hidden');
     document.getElementById('confirm-banner').classList.add('hidden');
-    if (viewingUserId !== myUserId) { viewingUserId = myUserId; fillPitchData(serverState.users[myUserId].team, "slot"); renderTabs(); }
+    
+    if (viewingUserId !== myUserId) { 
+        viewingUserId = myUserId; 
+        fillPitchData(serverState.users[myUserId].team, "slot"); 
+        renderTabs(); 
+    }
+    
     clearCompatibleHighlights();
     highlightCompatibleSlots(pendingPlayer);
     renderPlayers();
+
+    // NUEVO: Auto-scroll hacia el campo solo en móviles/tablets
+    if (window.innerWidth < 1024) {
+        document.getElementById('play-area').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 }
 
 function cancelPlacement() {
