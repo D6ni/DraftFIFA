@@ -741,9 +741,45 @@ function copyInviteLink() {
     navigator.clipboard.writeText(url).then(() => alert("Link copiado!"));
 }
 
+// Listas de nombres y equipos para los bots (¡Puedes añadir o cambiar los que quieras!)
+let botNamesPool = [
+    "Marc Sanchez", "Mohammed Lharrak", "David Ortega", "Alba Sanchez", 
+    "Javi Sero", "Duben Cruz", "Dani Perez", "Marcel Barrera", 
+    "Miguel Santiago", "Tung Tung Sahur", "El Patica", "Felipe VI"
+];
+let botTeamsPool = [
+    "Minabo de Kiev", "Vodka Juniors", "Recreativo de Juerga", "Steaua de Lanjarón", 
+    "Esfinter de Milán", "Bayern de Los Caídos", "Patético de Madrid", "Schalke Temeto", 
+    "Picharreal", "Rayo Cayetano", "Real Cólicos", "Real Pajagoza"
+];
+
 function addBot() {
     const botId = "bot_" + Math.random().toString(36).substr(2, 5);
-    roomRef.child('users').child(botId).set({ id: botId, nick: "Bot " + botCounter, teamName: "CPU " + botCounter, team: emptyTeam(), isBot: true });
+    
+    let bNick = "Bot " + botCounter;
+    let bTeam = "CPU " + botCounter;
+
+        // Si quedan nombres en las listas, elegimos uno al azar
+    if (botNamesPool.length > 0 && botTeamsPool.length > 0) {
+        const nameIdx = Math.floor(Math.random() * botNamesPool.length);
+        const teamIdx = Math.floor(Math.random() * botTeamsPool.length);
+        
+        bNick = botNamesPool[nameIdx];
+        bTeam = botTeamsPool[teamIdx];
+
+            // Los sacamos de la lista para que no se repitan en esta misma sala
+        botNamesPool.splice(nameIdx, 1);
+        botTeamsPool.splice(teamIdx, 1);
+    }
+
+    roomRef.child('users').child(botId).set({ 
+        id: botId, 
+        nick: bNick, 
+        teamName: bTeam, 
+        team: emptyTeam(), 
+        isBot: true 
+    });
+    
     botCounter++;
 }
 
@@ -1973,14 +2009,36 @@ function pushDraftPickToFirebase(player, slotId, userId) {
 
     function getBenchNeeds(team) {
         const subSlots = ['SUB1','SUB2','SUB3','SUB4','SUB5','SUB6','SUB7','SUB8','SUB9'];
-        const hasSub = (posList) => subSlots.some(s => team[s]?.id &&
-            team[s].pos?.split(',').map(x => x.trim().toUpperCase()).some(p => posList.includes(p)));
+        
+        // 1. Contamos cuántos jugadores de cada línea tenemos YA en el banquillo
+        let counts = { GK: 0, DEF: 0, MID: 0, ATT: 0 };
+        
+        subSlots.forEach(s => {
+            if (team[s] && team[s].id && team[s].pos) {
+                const pPos = team[s].pos.split(',').map(x => x.trim().toUpperCase());
+                if (pPos.includes('GK')) counts.GK++;
+                else if (pPos.some(p => ['CB','LB','RB','LWB','RWB'].includes(p))) counts.DEF++;
+                else if (pPos.some(p => ['CM','CDM','CAM'].includes(p))) counts.MID++;
+                else if (pPos.some(p => ['ST','CF','LW','RW'].includes(p))) counts.ATT++;
+            }
+        });
+
         const needs = [];
-        if (!hasSub(['GK']))                              needs.push(['GK']);
-        if (!hasSub(['CB','LB','RB','LWB','RWB']))        needs.push(['CB','LB','RB','LWB','RWB']);
-        if (!hasSub(['CM','CDM','CAM','LM','RM']))         needs.push(['CM','CDM','CAM','LM','RM']);
-        if (!hasSub(['ST','CF','LW','RW']))                needs.push(['ST','CF','LW','RW']);
-        needs.push(['GK','CB','LB','RB','CM','CDM','CAM','ST','CF','LW','RW','LM','RM','LWB','RWB']);
+        
+        // FASE 1: Cobertura mínima vital (Garantizar 1 suplente por línea)
+        if (counts.GK < 1)  needs.push(['GK']);
+        if (counts.DEF < 1) needs.push(['CB','LB','RB','LWB','RWB']);
+        if (counts.MID < 1) needs.push(['CM','CDM','CAM']);
+        if (counts.ATT < 1) needs.push(['ST','CF','LW','RW']);
+        
+        // FASE 2: Profundidad de banquillo (Buscar un 2º suplente para jugadores de campo)
+        if (counts.DEF < 2) needs.push(['CB','LB','RB','LWB','RWB']);
+        if (counts.MID < 2) needs.push(['CM','CDM','CAM']);
+        if (counts.ATT < 2) needs.push(['ST','CF','LW','RW']);
+        
+        // FASE 3: Relleno Final (Si ya hay 1 portero y 2 de cada, simplemente busca al mejor disponible)
+        needs.push(['GK','CB','LB','RB','LWB','RWB','CM','CDM','CAM','ST','CF','LW','RW']);
+        
         return needs;
     }
 
