@@ -82,39 +82,6 @@
             animation-direction: alternate-reverse;
         }
 
-        .draft-theme-overlay {
-            position: fixed;
-            inset: -20%;
-            pointer-events: none;
-            z-index: -1;
-            opacity: 0;
-            transform: scale(1.02);
-            filter: blur(64px) saturate(150%);
-            transition: opacity 1.18s ease-in-out, transform 1.18s ease-in-out;
-            will-change: opacity, transform;
-        }
-        .draft-theme-overlay.theme-default {
-            background:
-                radial-gradient(circle at 20% 25%, rgba(20, 20, 125, 0.42) 0 11%, transparent 30%),
-                radial-gradient(circle at 78% 30%, rgba(40, 40, 170, 0.26) 0 10%, transparent 28%),
-                radial-gradient(circle at 48% 78%, rgba(84, 84, 210, 0.20) 0 12%, transparent 33%),
-                radial-gradient(circle at 62% 52%, rgba(255,255,255,0.05) 0 3%, transparent 18%);
-        }
-        .draft-theme-overlay.theme-selecting {
-            background:
-                radial-gradient(circle at 20% 25%, rgba(125, 20, 118, 0.52) 0 11%, transparent 30%),
-                radial-gradient(circle at 78% 30%, rgba(164, 45, 154, 0.36) 0 10%, transparent 28%),
-                radial-gradient(circle at 48% 78%, rgba(81, 14, 76, 0.28) 0 12%, transparent 33%),
-                radial-gradient(circle at 62% 52%, rgba(255,255,255,0.04) 0 3%, transparent 18%);
-        }
-        .draft-theme-overlay.theme-confirming {
-            background:
-                radial-gradient(circle at 20% 25%, rgba(34, 135, 4, 0.52) 0 11%, transparent 30%),
-                radial-gradient(circle at 78% 30%, rgba(74, 167, 45, 0.36) 0 10%, transparent 28%),
-                radial-gradient(circle at 48% 78%, rgba(18, 84, 2, 0.28) 0 12%, transparent 33%),
-                radial-gradient(circle at 62% 52%, rgba(255,255,255,0.04) 0 3%, transparent 18%);
-        }
-
         @keyframes lavaDrift {
             0%   { transform: translate3d(-2%, -1%, 0) scale(1.02) rotate(-2deg); }
             50%  { transform: translate3d(3%, 2%, 0) scale(1.09) rotate(1deg); }
@@ -228,7 +195,6 @@ select option {
 </style>
 </head>
 <body class="p-4 md:p-8 flex flex-col items-center min-h-screen relative theme-default">
-    <div id="draft-theme-overlay" class="draft-theme-overlay theme-default" aria-hidden="true"></div>
 
     <!-- ================================
          SISTEMA DE AUDIO Y CONTROLES
@@ -612,53 +578,12 @@ class="hidden absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-whit
     let botCounter = 1;
     let _posBuckets = {};
     let _prevPickIndex = -1;
-    let _draftTheme = 'theme-default';
-    let _themeTransitionToken = 0;
-    let _themeSwapTimer = null;
-    let _themeFadeTimer = null;
 
     function setDraftTheme(mode) {
         const root = document.body;
-        const overlay = document.getElementById('draft-theme-overlay');
-        if (!root || !overlay) return;
-
-        const allowed = ['theme-default', 'theme-selecting', 'theme-confirming'];
-        if (!allowed.includes(mode)) mode = 'theme-default';
-
-        const token = ++_themeTransitionToken;
-        const current = _draftTheme;
-        _draftTheme = mode;
-
-        if (current === mode && overlay.style.opacity === '0') {
-            root.classList.remove('theme-default', 'theme-selecting', 'theme-confirming');
-            root.classList.add(mode);
-            return;
-        }
-
-        overlay.classList.remove('theme-default', 'theme-selecting', 'theme-confirming');
-        overlay.classList.add(mode);
-        overlay.style.opacity = '0';
-        overlay.style.transform = 'scale(1.02)';
-        void overlay.offsetWidth;
-        overlay.style.opacity = mode === 'theme-default' ? '0.28' : '0.56';
-        overlay.style.transform = 'scale(1.045)';
-
-        const swapDelay = 720;
-        const fadeOutDelay = 1280;
-        window.clearTimeout(_themeSwapTimer);
-        window.clearTimeout(_themeFadeTimer);
-
-        _themeSwapTimer = window.setTimeout(() => {
-            if (token !== _themeTransitionToken) return;
-            root.classList.remove('theme-default', 'theme-selecting', 'theme-confirming');
-            root.classList.add(mode);
-        }, swapDelay);
-
-        _themeFadeTimer = window.setTimeout(() => {
-            if (token !== _themeTransitionToken) return;
-            overlay.style.opacity = '0';
-            overlay.style.transform = 'scale(1.02)';
-        }, fadeOutDelay);
+        if (!root) return;
+        root.classList.remove('theme-default', 'theme-selecting', 'theme-confirming');
+        root.classList.add(mode);
     }
 
     function resetDraftTheme() {
@@ -2058,7 +1983,9 @@ function startPlacementDraft(playerId) {
     if (isRevealing) return;
     pendingPlayer = availablePlayers.find(p => p.id === playerId);
     if (!pendingPlayer) return;
-    
+
+    setDraftTheme('theme-selecting');
+
     document.getElementById('pitch-container').classList.add('highlight-slots');
     document.getElementById('placement-name').innerText = pendingPlayer.name;
     document.getElementById('placement-banner').classList.remove('hidden');
