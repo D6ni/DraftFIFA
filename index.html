@@ -1272,16 +1272,26 @@ function updateDraftUI() {
 }
 
 function renderTabs() {
-    const div = document.getElementById('team-tabs'); div.innerHTML = '';
-    for(let uid in serverState.users) {
-        const u = serverState.users[uid];
-        const b = document.createElement('button');
-        b.className = `px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${u.id === viewingUserId ? 'bg-blue-600 text-white' : 'bg-white/10 text-gray-400 hover:bg-white/20'}`;
-        b.innerText = u.teamName; 
-        b.onclick = () => { viewingUserId = u.id; fillPitchData(serverState.users[viewingUserId].team, "slot"); renderTabs(); };
-        div.appendChild(b);
+        const div = document.getElementById('team-tabs'); div.innerHTML = '';
+        for(let uid in serverState.users) {
+            const u = serverState.users[uid];
+            const b = document.createElement('button');
+            
+            // Ajustamos un poco el estilo para que las dos líneas encajen perfectas
+            b.className = `px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition text-center leading-tight ${u.id === viewingUserId ? 'bg-blue-600 text-white shadow-md' : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-gray-200'}`;
+            
+            // Aquí es donde añadimos el salto de línea y el Nick en tamaño mini (text-[9px])
+            b.innerHTML = `${u.teamName}<span class="block text-[9px] font-normal opacity-70 mt-0.5">${u.nick}</span>`; 
+            
+            b.onclick = () => { 
+                viewingUserId = u.id; 
+                fillPitchData(serverState.users[viewingUserId].team, "slot"); 
+                renderTabs(); 
+            };
+            
+            div.appendChild(b);
+        }
     }
-}
 
 function fillPitchData(team, prefix) {
     team = team || {}; 
