@@ -2050,47 +2050,63 @@ function pushDraftPickToFirebase(player, slotId, userId) {
 
         let unpickedPlayers = availablePlayers.filter(p => !localTakenPlayers[p.id]);
         let caches = getDraftContextCaches(uId);
+
+        // 1. PUNTUAR JUGADORES (Con factor de "opinión personal" aleatoria)
+        // Multiplicamos la puntuación real por un valor entre 0.95 y 1.05. 
+        // Así los bots valoran a los jugadores de forma ligeramente distinta y no son clones.
         let scoredPlayers = unpickedPlayers.slice(0, 300)
-        .map(p => ({ p, score: calculatePlayerScore(p, uId, caches) }))
-        .sort((a, b) => b.score - a.score);
+            .map(p => {
+                let baseScore = calculatePlayerScore(p, uId, caches);
+                let randomFactor = 0.95 + (Math.random() * 0.10); 
+                return { p, score: baseScore * randomFactor };
+            })
+            .sort((a, b) => b.score - a.score);
 
         let chosenSlot = null, chosenPlayer = null;
 
-    // ── Titulares vacíos: elige por urgencia (escasez + calidad) ──
+        // 2. BUSCAR EL MEJOR JUGADOR PARA EL 11 TITULAR
         const emptyStarters = allSlots.filter(s => !s.startsWith('SUB') && (!team[s] || !team[s].id));
+
         if (emptyStarters.length > 0) {
-            let slotCandidates = [];
-            for (const s of emptyStarters) {
-                const best = scoredPlayers.find(item => {
+            // En vez de mirar posiciones, miramos la lista de los mejores jugadores del mercado de arriba a abajo
+            for (const item of scoredPlayers) {
+                const p = item.p;
+                const pPosArray = p.pos.split(',').map(x => x.trim().toUpperCase());
+
+                // ¿Este jugador top encaja en ALGUNO de mis huecos titulares libres?
+                const matchingSlot = emptyStarters.find(s => {
                     if (botPosRules[s].includes('ANY')) return true;
-                    return item.p.pos.split(',').map(x => x.trim().toUpperCase()).some(p => botPosRules[s].includes(p));
+                    return pPosArray.some(pos => botPosRules[s].includes(pos));
                 });
-                if (!best) continue;
-                const eliteLeft = unpickedPlayers.filter(p => {
-                    if (p.rat < 84) return false;
-                    if (botPosRules[s].includes('ANY')) return true;
-                    return p.pos.split(',').map(x => x.trim().toUpperCase()).some(pos => botPosRules[s].includes(pos));
-                }).length;
-                const urgency = best.score + (eliteLeft <= 2 ? 2000 : eliteLeft <= 5 ? 800 : 0);
-                slotCandidates.push({ slot: s, player: best.p, urgency });
-            }
-            if (slotCandidates.length > 0) {
-                slotCandidates.sort((a, b) => b.urgency - a.urgency);
-                chosenSlot = slotCandidates[0].slot;
-                chosenPlayer = slotCandidates[0].player;
+
+                if (matchingSlot) {
+                    chosenPlayer = p;
+                    chosenSlot = matchingSlot;
+                    break; // ¡Encontramos al mejor jugador para un hueco libre! Paramos de buscar.
+                }
             }
         }
 
-    // ── Banquillo: cubre necesidades equilibradas ──
+        // 3. SI EL 11 ESTÁ LLENO, BUSCAR PARA EL BANQUILLO (Equilibrado)
         if (!chosenPlayer) {
             const benchSlots = allSlots.filter(s => s.startsWith('SUB') && (!team[s] || !team[s].id));
             if (benchSlots.length > 0) {
-                const benchNeeds = getBenchNeeds(team);
+                const benchNeeds = getBenchNeeds(team); // Llama a la función que creamos antes
+                
                 for (const need of benchNeeds) {
-                    const candidate = unpickedPlayers.find(p =>
-                        p.pos.split(',').map(x => x.trim().toUpperCase()).some(pos => need.includes(pos)));
-                    if (candidate) { chosenSlot = benchSlots[0]; chosenPlayer = candidate; break; }
+                    // Buscar al jugador con mayor puntuación que cumpla la necesidad del banquillo
+                    const candidateItem = scoredPlayers.find(item =>
+                        item.p.pos.split(',').map(x => x.trim().toUpperCase()).some(pos => need.includes(pos))
+                    );
+                    
+                    if (candidateItem) { 
+                        chosenSlot = benchSlots[0]; 
+                        chosenPlayer = candidateItem.p; 
+                        break; 
+                    }
                 }
+                
+                // Si la necesidad era rara y no queda nadie, ficha al mejor que quede
                 if (!chosenPlayer && unpickedPlayers.length > 0) {
                     chosenSlot = benchSlots[0];
                     chosenPlayer = scoredPlayers[0]?.p || unpickedPlayers[0];
@@ -2098,11 +2114,16 @@ function pushDraftPickToFirebase(player, slotId, userId) {
             }
         }
 
+        // 4. FALLBACK DE SEGURIDAD ABSOLUTA
         if (!chosenSlot || !chosenPlayer) {
             chosenSlot = allSlots.find(x => !team[x] || !team[x].id);
             chosenPlayer = unpickedPlayers[0];
         }
-        if (chosenSlot && chosenPlayer) pushDraftPickToFirebase(chosenPlayer, chosenSlot, uId);
+
+        // 5. REGISTRAR EL PICK
+        if (chosenSlot && chosenPlayer) {
+            pushDraftPickToFirebase(chosenPlayer, chosenSlot, uId);
+        }
     }
 
     function startLocalTimerLoop() {
