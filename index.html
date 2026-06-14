@@ -901,6 +901,7 @@ function listenToServer() {
         serverState = data;
         localTakenPlayers = data.takenPlayers || {};
         updateNewsTickerUI(data.ticker);
+        setDraftTheme(data.turnTheme || 'theme-default');
 
         if(data.status === 'lobby') updateLobbyList();
         else if(data.status === 'lottery') {
@@ -1303,10 +1304,7 @@ let _prevActiveUid = null; // ← también añade esta variable aquí
 
 function updateDraftUI() {
     updateDraftTracker();
-    if (_prevPickIndex !== serverState.currentPickIndex) {
-        resetDraftTheme();
-        _prevPickIndex = serverState.currentPickIndex;
-    }
+    
     document.getElementById('round-indicator').innerText = serverState.currentPickIndex + 1;
     const activeUid = serverState.draftOrder[serverState.currentPickIndex];
     const activeUser = serverState.users[activeUid];
@@ -1356,6 +1354,10 @@ function updateDraftUI() {
     if(isHost && activeUser.isBot && !isRevealing) {
         if(window.botWorkingForIndex !== serverState.currentPickIndex) {
             window.botWorkingForIndex = serverState.currentPickIndex;
+            
+            // NUEVO: El bot avisa de que está pensando y pone el fondo morado a todos
+            roomRef.update({ turnTheme: 'theme-selecting' });
+            
             let botThinkingTime = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
             setTimeout(() => { if (serverState.draftOrder[serverState.currentPickIndex] === activeUid && !isRevealing) makeAutoPick(activeUid); }, botThinkingTime);
         }
@@ -1984,7 +1986,10 @@ function startPlacementDraft(playerId) {
     pendingPlayer = availablePlayers.find(p => p.id === playerId);
     if (!pendingPlayer) return;
 
-    setDraftTheme('theme-selecting');
+    // Si es mi turno, le digo a Firebase que cambie el fondo a todos a morado
+    if (serverState.draftOrder[serverState.currentPickIndex] === myUserId) {
+        roomRef.update({ turnTheme: 'theme-selecting' });
+    }
 
     document.getElementById('pitch-container').classList.add('highlight-slots');
     document.getElementById('placement-name').innerText = pendingPlayer.name;
@@ -2009,7 +2014,10 @@ function startPlacementDraft(playerId) {
 
 function cancelPlacement() {
     pendingPlayer = null; pendingSlot = null;
-    resetDraftTheme();
+    // Si cancelo y era mi turno, vuelvo a poner el fondo azul a todos
+    if (serverState.draftOrder[serverState.currentPickIndex] === myUserId) {
+        roomRef.update({ turnTheme: 'theme-default' });
+    }
     document.getElementById('pitch-container').classList.remove('highlight-slots');
     document.getElementById('placement-banner').classList.add('hidden');
     document.getElementById('confirm-banner').classList.add('hidden');
@@ -2049,11 +2057,11 @@ function pushDraftPickToFirebase(player, slotId, userId) {
     let updates = {};
     updates[`users/${userId}/team/${slotId}`] = player;
     updates[`takenPlayers/${player.id}`] = true;
+    updates[`turnTheme`] = 'theme-confirming';
 
     let gradeInfo = getGrade(player, userId);
     updates[`reveal`] = { player: player, slotId: slotId, userId: userId, pickNum: serverState.currentPickIndex + 1, ts: Date.now(), grade: gradeInfo.grade, gradeClass: gradeInfo.class };
 
-    setDraftTheme('theme-confirming');
     pendingPlayer = null; pendingSlot = null;
     document.getElementById('pitch-container').classList.remove('highlight-slots');
     document.querySelectorAll('.selected-slot').forEach(e => e.classList.remove('selected-slot'));
@@ -2088,31 +2096,18 @@ function pushDraftPickToFirebase(player, slotId, userId) {
         document.getElementById('jumbo-pos-text').innerText = slotId.replace(/[0-9]/g, '');
 
         setTimeout(() => {
-            ratBox.classList.remove('hidden'); ratBox.classList.add('animate-scale-in');
-            setTimeout(() => {
-                let delay = 0;
-                player.name.split('').forEach(char => {
-                    const span = document.createElement('span'); span.innerHTML = char === ' ' ? '&nbsp;' : char; span.className = 'letter'; span.style.animation = `fadeInLetter 0.8s ease-out forwards ${delay}ms`;
-                    nameBox.appendChild(span); delay += 100;
-                });
-                
-                setTimeout(() => { 
-                    posBox.classList.remove('opacity-0'); 
-                    gradeBox.innerText = grade;
-                    gradeBox.className = `grade-stamp ${gradeClass}`;
-                }, delay + 400);
-                
-                setTimeout(() => {
-                    isRevealing = false; jumbo.classList.add('hidden');
-                    if(isHost) {
-                        const nextPick = serverState.currentPickIndex + 1;
-                        if(nextPick >= serverState.draftOrder.length) roomRef.update({ status: 'finished' });
-                        else roomRef.update({ currentPickIndex: nextPick, turnEndTime: Date.now() + (turnTime * 1000) });
-                    }
-                    updateDraftUI();
-                }, delay + 4000); 
-            }, 800);
-        }, 500);
+            isRevealing = false; jumbo.classList.add('hidden');
+            if(isHost) {
+                const nextPick = serverState.currentPickIndex + 1;
+                if(nextPick >= serverState.draftOrder.length) {
+                    roomRef.update({ status: 'finished', turnTheme: 'theme-default' });
+                } else {
+                            // NUEVO: Resetear el fondo a azul al cambiar de turno
+                    roomRef.update({ currentPickIndex: nextPick, turnEndTime: Date.now() + (turnTime * 1000), turnTheme: 'theme-default' });
+                }
+            }
+            updateDraftUI();
+        }, delay + 4000);
     }
 
     // ==========================================
