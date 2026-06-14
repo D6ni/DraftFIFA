@@ -293,20 +293,20 @@ select option {
             </div>
 
             <!-- 4. SORTEO ANIMADO -->
-            <div id="lottery-screen" class="hidden w-full min-h-screen fixed top-0 left-0 bg-slate-900/95 z-50 flex-col items-center justify-center p-4">
-                <h1 class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-8 tracking-widest uppercase drop-shadow-lg">Sorteo del Draft</h1>
-                <div class="glass p-10 text-center w-full max-w-3xl flex flex-col justify-center items-center relative overflow-hidden" style="min-height: 350px;">
-                    <div id="lottery-msg" class="text-2xl md:text-3xl text-gray-300 font-bold mb-6 transition-all duration-300">Mezclando equipos...</div>
-                    <div id="lottery-reveal" class="text-5xl md:text-7xl font-black text-white scale-0 transition-transform duration-500 drop-shadow-[0_0_20px_rgba(255,255,255,0.5)]"></div>
-                    <div id="lottery-top2" class="hidden w-full justify-around items-center mt-6">
-                        <div id="top2-left" class="glass p-6 text-2xl md:text-4xl font-black w-[40%] text-center transition-all duration-300 break-words"></div>
-                        <div class="text-4xl md:text-6xl font-black text-red-500 px-4 animate-pulse">VS</div>
-                        <div id="top2-right" class="glass p-6 text-2xl md:text-4xl font-black w-[40%] text-center transition-all duration-300 break-words"></div>
-                    </div>
+            <div id="lottery-screen" class="hidden w-full min-h-screen fixed top-0 left-0 bg-slate-900/95 z-[70] flex-col items-center justify-center p-4">
+                <h1 class="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-4 tracking-widest uppercase drop-shadow-lg">Sorteo del Draft</h1>
+                
+                <!-- Caja central más compacta -->
+                <div class="glass p-6 w-full max-w-2xl flex flex-col justify-center items-center relative overflow-hidden flex-shrink-0" style="min-height: 180px;">
+                    <div id="lottery-msg" class="text-xl md:text-2xl text-gray-300 font-bold mb-4 transition-all duration-300">Mezclando equipos...</div>
+                    <div id="lottery-reveal" class="text-3xl md:text-5xl font-black text-white scale-0 transition-transform duration-500 drop-shadow-[0_0_20px_rgba(255,255,255,0.5)]"></div>
                 </div>
-                <div class="mt-10 w-full max-w-3xl">
-                    <h3 class="text-center text-gray-400 font-bold mb-4 uppercase tracking-widest">Orden de Selección</h3>
-                    <div id="lottery-results" class="flex flex-col-reverse gap-2"></div>
+
+                <!-- Lista de resultados con scroll (Ordenada de arriba a abajo) -->
+                <div class="mt-4 w-full max-w-2xl overflow-hidden flex flex-col flex-1 pb-4">
+                    <h3 class="text-center text-gray-400 font-bold mb-3 uppercase tracking-widest text-xs md:text-sm flex-shrink-0">Orden de Selección</h3>
+                    <!-- Hemos quitado flex-col-reverse para que el Pick 1 quede arriba del todo -->
+                    <div id="lottery-results" class="flex flex-col gap-2 overflow-y-auto pr-2 pb-10"></div>
                 </div>
             </div>
 
@@ -1023,27 +1023,85 @@ function updateNewsTickerUI(tickerArr) {
         const msgEl = document.getElementById('lottery-msg');
         const revealEl = document.getElementById('lottery-reveal');
         const resultsEl = document.getElementById('lottery-results');
+        
+        resultsEl.innerHTML = ''; // Limpiar por si acaso
+        revealEl.classList.remove('text-yellow-400', 'animate-pulse');
 
+        // 1. Animación inicial (Mezclando)
         msgEl.innerText = "Mezclando equipos...";
         revealEl.style.transform = "scale(1)";
-        for(let i=0; i<20; i++) { revealEl.innerText = serverState.users[orderIds[Math.floor(Math.random() * orderIds.length)]].teamName; await delay(120); }
-            revealEl.style.transform = "scale(0)"; await delay(500);
+        for(let i=0; i<20; i++) { 
+            revealEl.innerText = serverState.users[orderIds[Math.floor(Math.random() * orderIds.length)]].teamName; 
+            await delay(120); 
+        }
+        revealEl.style.transform = "scale(0)"; 
+        await delay(500);
 
+        // 2. Revelar de abajo a arriba
         for (let i = orderIds.length - 1; i >= 0; i--) {
-            msgEl.innerText = i === 0 ? "¡Y EL PICK #1 ES PARA..." : `En el Pick #${i + 1} elige...`;
+            
+            // --- ¡NUEVO! RULETA CUANDO QUEDAN SOLO 2 EQUIPOS ---
+            if (i === 1 && orderIds.length >= 2) {
+                msgEl.innerText = "¡DUELO FINAL POR EL PICK #1!";
+                revealEl.style.transform = "scale(1)";
+                
+                let team1 = serverState.users[orderIds[0]].teamName; // El que será el Pick #1
+                let team2 = serverState.users[orderIds[1]].teamName; // El que será el Pick #2
+                
+                // Efecto Ruleta de CS:GO (Flash rápido que va frenando)
+                let delayMs = 40;
+                for(let f=0; f<22; f++) {
+                    revealEl.innerText = (f % 2 === 0) ? team1 : team2;
+                    await delay(delayMs);
+                    delayMs += (f * 1.5); // Frena progresivamente
+                }
+                
+                revealEl.style.transform = "scale(0)"; 
+                await delay(800);
+
+                // Mostramos el que se ha llevado el Pick 2
+                msgEl.innerText = "En el Pick #2 elige...";
+                await delay(1000);
+                revealEl.innerText = team2;
+                revealEl.style.transform = "scale(1)";
+                await delay(2000);
+                
+                resultsEl.innerHTML = `<div class="bg-white/5 border border-white/10 p-2 md:p-3 rounded-lg flex justify-between animate-scale-in text-sm md:text-lg shadow-lg"><span class="font-bold text-gray-400">Pick #2</span><span class="font-bold text-white">${team2}</span></div>` + resultsEl.innerHTML;
+                
+                revealEl.style.transform = "scale(0)"; 
+                await delay(1200);
+
+                // Mostramos al ganador absoluto
+                msgEl.innerText = "¡Y EL PICK #1 ES PARA...";
+                await delay(1500);
+                revealEl.innerText = team1;
+                revealEl.classList.add('text-yellow-400');
+                revealEl.style.transform = "scale(1)";
+                pushNews(`¡${team1} ha ganado la lotería del Pick #1!`);
+                await delay(3000);
+                
+                resultsEl.innerHTML = `<div class="bg-gradient-to-r from-yellow-600/40 to-yellow-400/20 border border-yellow-400 p-3 md:p-4 rounded-lg flex justify-between animate-scale-in text-lg md:text-xl shadow-[0_0_15px_rgba(250,204,21,0.4)]"><span class="font-black text-yellow-400">Pick #1</span><span class="font-black text-yellow-300">${team1}</span></div>` + resultsEl.innerHTML;
+                
+                revealEl.style.transform = "scale(0)";
+                
+                break; // Rompemos el bucle porque ya hemos resuelto el i=1 y el i=0 a la vez
+            }
+
+            // --- REVELACIÓN NORMAL (Del Pick 3 en adelante) ---
+            msgEl.innerText = `En el Pick #${i + 1} elige...`;
             await delay(1000);
             revealEl.innerText = serverState.users[orderIds[i]].teamName;
             revealEl.style.transform = "scale(1)";
-            if(i===0) { revealEl.classList.add('text-yellow-400'); pushNews("¡" + revealEl.innerText + " ha ganado la lotería del Pick #1!"); }
-            await delay(2000);
+            await delay(1500);
             
-            let bg = i===0 ? 'bg-gradient-to-r from-yellow-600/30 to-yellow-400/30 border-yellow-400 text-yellow-300' : 'bg-white/5 border-white/10 text-white';
-            resultsEl.innerHTML = `<div class="${bg} border p-3 rounded flex justify-between animate-scale-in text-xl shadow-lg"><span class="font-bold">Pick #${i+1}</span><span class="font-bold">${serverState.users[orderIds[i]].teamName}</span></div>` + resultsEl.innerHTML;
-            revealEl.style.transform = "scale(0)"; await delay(800);
+            resultsEl.innerHTML = `<div class="bg-white/5 border border-white/10 p-2 md:p-3 rounded-lg flex justify-between animate-scale-in text-sm md:text-lg shadow-lg"><span class="font-bold text-gray-400">Pick #${i+1}</span><span class="font-bold text-white">${serverState.users[orderIds[i]].teamName}</span></div>` + resultsEl.innerHTML;
+            
+            revealEl.style.transform = "scale(0)"; 
+            await delay(600);
         }
 
         msgEl.innerText = "¡ORDEN DEFINIDO! PASANDO AL PRE-DRAFT...";
-        if(isHost) { await delay(3000); roomRef.update({ status: 'predraft' }); }
+        if(isHost) { await delay(3500); roomRef.update({ status: 'predraft' }); }
     }
 
     function renderPreDraftBoard() {
