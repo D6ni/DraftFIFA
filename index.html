@@ -134,6 +134,8 @@
         
         .grade-stamp { position: absolute; right: 20px; top: 20px; font-size: 5rem; font-weight: 900; opacity: 0; transform: scale(3) rotate(-15deg); animation: stampIn 0.5s 1.5s forwards; text-shadow: 2px 2px 0 #000; border: 6px solid; border-radius: 50%; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; z-index: 50;}
         @keyframes stampIn { to { opacity: 0.9; transform: scale(1) rotate(-15deg); } }
+        .grade-Splus { color: #06b6d4; border-color: #06b6d4; box-shadow: 0 0 25px rgba(6,182,212,0.6); text-shadow: 0 0 15px rgba(6,182,212,0.8); }
+        .grade-S { color: #a855f7; border-color: #a855f7; box-shadow: 0 0 20px rgba(168,85,247,0.6); text-shadow: 0 0 10px rgba(168,85,247,0.8); }
         .grade-A { color: #22c55e; border-color: #22c55e; }
         .grade-B { color: #3b82f6; border-color: #3b82f6; }
         .grade-C { color: #eab308; border-color: #eab308; }
@@ -214,9 +216,10 @@ select option {
                 <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.2" class="w-20 md:w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500" onchange="updateVolume(this.value)" oninput="updateVolume(this.value)">
             </div>
 
-            <!-- POPUP PERSONALIZADO DE ÉXITO -->
-            <div id="custom-alert" class="fixed top-10 left-1/2 transform -translate-x-1/2 bg-green-600 border border-green-400 text-white px-6 py-3 rounded-lg shadow-[0_0_20px_rgba(34,197,94,0.6)] z-50 transition-all duration-300 opacity-0 pointer-events-none translate-y-[-20px] font-bold flex items-center gap-2">
-                <i class="fas fa-check-circle"></i> <span id="custom-alert-text">Mensaje</span>
+            <!-- POPUP PERSONALIZADO DE ÉXITO/ERROR (NOTIFICACIONES GLOBALES) -->
+            <div id="custom-alert" class="fixed top-[15%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 px-8 py-4 rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.6)] z-[90] transition-all duration-500 opacity-0 pointer-events-none scale-90 backdrop-blur-xl border flex flex-col items-center justify-center gap-2 text-center w-[90%] max-w-sm">
+                <i id="custom-alert-icon" class="fas fa-check-circle text-4xl mb-1 drop-shadow-md"></i> 
+                <span id="custom-alert-text" class="font-black text-lg tracking-wide drop-shadow-md">Mensaje</span>
             </div>
 
             <!-- NEWS TICKER (TOP) -->
@@ -921,6 +924,33 @@ function listenToServer() {
         serverState = data;
         localTakenPlayers = data.takenPlayers || {};
         updateNewsTickerUI(data.ticker);
+
+        // NUEVO: Detector de notificaciones de Trades para ambos jugadores
+        if (data.trades) {
+            Object.keys(data.trades).forEach(tid => {
+                const t = data.trades[tid];
+                // Si el trade me involucra (soy el que lo envía o el que lo recibe)
+                if (t.from === myUserId || t.to === myUserId) {
+                    // Y no lo he visto todavía (usamos el window para no repetir popups)
+                    if (!window.seenTrades) window.seenTrades = {};
+                    if (!window.seenTrades[tid + t.status] && t.status !== 'pending') {
+                        
+                        // Dependiendo del estado, mostramos un popup u otro
+                        if (t.status === 'accepted') {
+                            showCustomAlert(`Traspaso con ${serverState.users[t.from === myUserId ? t.to : t.from].nick} COMPLETADO`, 'success');
+                            playChatNotification(); // Opcional: Usamos el sonido del chat para avisar
+                        } else if (t.status === 'rejected') {
+                            showCustomAlert(`${serverState.users[t.to].nick} ha RECHAZADO tu oferta`, 'error');
+                        } else if (t.status === 'cancelled' && t.to === myUserId) {
+                            showCustomAlert(`${serverState.users[t.from].nick} ha CANCELADO su oferta`, 'error');
+                        }
+                        
+                        window.seenTrades[tid + t.status] = true;
+                    }
+                }
+            });
+        }
+
         setDraftTheme(data.turnTheme || 'theme-default');
 
         if(data.status === 'lobby') updateLobbyList();
@@ -1009,16 +1039,36 @@ function updateNewsTickerUI(tickerArr) {
         }
     }
 
-    function showCustomAlert(msg) {
+    // type: 'success' (verde), 'error' (rojo), 'info' (azul)
+    function showCustomAlert(msg, type = 'success') {
         const alertBox = document.getElementById('custom-alert');
-        document.getElementById('custom-alert-text').innerText = msg;
-        alertBox.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-[-20px]');
-        alertBox.classList.add('opacity-100', 'translate-y-0');
+        const icon = document.getElementById('custom-alert-icon');
+        const text = document.getElementById('custom-alert-text');
+        
+        text.innerText = msg;
+        
+        // Limpiar clases de color
+        alertBox.className = alertBox.className.replace(/bg-\w+-900\/80/g, '').replace(/border-\w+-400\/50/g, '');
+        
+        if (type === 'success') {
+            alertBox.classList.add('bg-green-900/80', 'border-green-400/50');
+            icon.className = 'fas fa-check-circle text-4xl mb-1 text-green-400 drop-shadow-md';
+        } else if (type === 'error') {
+            alertBox.classList.add('bg-red-900/80', 'border-red-400/50');
+            icon.className = 'fas fa-times-circle text-4xl mb-1 text-red-400 drop-shadow-md';
+        } else {
+            alertBox.classList.add('bg-blue-900/80', 'border-blue-400/50');
+            icon.className = 'fas fa-info-circle text-4xl mb-1 text-blue-400 drop-shadow-md';
+        }
+
+        // Animación de entrada
+        alertBox.classList.remove('opacity-0', 'pointer-events-none', 'scale-90');
+        alertBox.classList.add('opacity-100', 'scale-100');
         
         setTimeout(() => {
-            alertBox.classList.remove('opacity-100', 'translate-y-0');
-            alertBox.classList.add('opacity-0', 'pointer-events-none', 'translate-y-[-20px]');
-        }, 3000);
+            alertBox.classList.remove('opacity-100', 'scale-100');
+            alertBox.classList.add('opacity-0', 'pointer-events-none', 'scale-90');
+        }, 3500); // 3.5 segundos en pantalla
     }
 
     function updateLobbyList() {
@@ -1347,33 +1397,33 @@ function toggleTradePick(type, index) {
 
     function cancelTrade(tradeId) {
         roomRef.child('trades').child(tradeId).update({ status: 'cancelled' });
-        showCustomAlert("Has cancelado la oferta.");
-    }
+    showCustomAlert("Has cancelado la oferta", "error"); // Añadido el "error"
+}
 
-    function renderTrades() {
-        const incDiv = document.getElementById('incoming-trades');
-        if (!incDiv) return;
-        
-        let html = "";
-        let hasAny = false;
+function renderTrades() {
+    const incDiv = document.getElementById('incoming-trades');
+    if (!incDiv) return;
+    
+    let html = "";
+    let hasAny = false;
 
-        if(serverState.trades) {
+    if(serverState.trades) {
         // Filtramos solo las pendientes de la fase de Pre-Draft
-            const pendingTrades = Object.entries(serverState.trades).filter(([id, t]) => t.status === 'pending' && t.phase !== 'draft');
-            
-            const incoming = pendingTrades.filter(([id, t]) => t.to === myUserId);
-            const outgoing = pendingTrades.filter(([id, t]) => t.from === myUserId);
+        const pendingTrades = Object.entries(serverState.trades).filter(([id, t]) => t.status === 'pending' && t.phase !== 'draft');
+        
+        const incoming = pendingTrades.filter(([id, t]) => t.to === myUserId);
+        const outgoing = pendingTrades.filter(([id, t]) => t.from === myUserId);
 
         // 1. Mostrar las recibidas
-            if (incoming.length > 0) {
-                hasAny = true;
-                html += `<div class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 mt-1">Recibidas</div>`;
-                incoming.forEach(([tid, t]) => {
-                    const fromUser = serverState.users[t.from]?.nick || 'Desconocido';
-                    const giveStr = (t.give || []).map(i => `#${i+1}`).join(', ');
-                    const getStr = (t.get || []).map(i => `#${i+1}`).join(', ');
-                    
-                    html += `
+        if (incoming.length > 0) {
+            hasAny = true;
+            html += `<div class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 mt-1">Recibidas</div>`;
+            incoming.forEach(([tid, t]) => {
+                const fromUser = serverState.users[t.from]?.nick || 'Desconocido';
+                const giveStr = (t.give || []).map(i => `#${i+1}`).join(', ');
+                const getStr = (t.get || []).map(i => `#${i+1}`).join(', ');
+                
+                html += `
                     <div class="bg-indigo-900/50 border border-indigo-500/50 p-2.5 rounded-lg flex flex-col gap-2 shadow-lg mb-2">
                         <div class="text-[11px] text-gray-200 text-center leading-relaxed">
                             <span class="font-black text-indigo-300">${fromUser}</span> ofrece <b class="text-yellow-400">[${giveStr}]</b> por tus <b class="text-green-400">[${getStr}]</b>
@@ -1382,44 +1432,43 @@ function toggleTradePick(type, index) {
                             <button onclick="resolveTrade('${tid}', true)" class="flex-1 bg-green-600 hover:bg-green-500 py-1.5 rounded text-white font-bold text-[10px] uppercase tracking-wider transition">Aceptar</button>
                             <button onclick="resolveTrade('${tid}', false)" class="flex-1 bg-red-600 hover:bg-red-500 py-1.5 rounded text-white font-bold text-[10px] uppercase tracking-wider transition">Rechazar</button>
                         </div>
-                    </div>`;
-                });
-            }
+                </div>`;
+            });
+        }
 
         // 2. Mostrar las enviadas
-            if (outgoing.length > 0) {
-                hasAny = true;
-                html += `<div class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 mt-3">Enviadas (Pendientes)</div>`;
-                outgoing.forEach(([tid, t]) => {
-                    const toUser = serverState.users[t.to]?.nick || 'Desconocido';
-                    const giveStr = (t.give || []).map(i => `#${i+1}`).join(', ');
-                    const getStr = (t.get || []).map(i => `#${i+1}`).join(', ');
-                    
-                    html += `
+        if (outgoing.length > 0) {
+            hasAny = true;
+            html += `<div class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 mt-3">Enviadas (Pendientes)</div>`;
+            outgoing.forEach(([tid, t]) => {
+                const toUser = serverState.users[t.to]?.nick || 'Desconocido';
+                const giveStr = (t.give || []).map(i => `#${i+1}`).join(', ');
+                const getStr = (t.get || []).map(i => `#${i+1}`).join(', ');
+                
+                html += `
                     <div class="bg-black/40 border border-white/10 p-2 rounded-lg flex justify-between items-center mb-1.5">
                         <div class="text-[10px] text-gray-300 leading-tight">
                             A <b>${toUser}</b>:<br>Das [${giveStr}] ⇄ Pides [${getStr}]
                         </div>
                         <button onclick="cancelTrade('${tid}')" class="text-[10px] text-red-400 underline hover:text-red-300 ml-2 bg-red-900/20 px-2 py-1 rounded">Cancelar</button>
-                    </div>`;
-                });
-            }
+                </div>`;
+            });
         }
-
-        if (!hasAny) {
-            html = `<div class="text-xs text-gray-500 italic text-center py-4 bg-black/20 rounded border border-white/5">No hay ofertas activas</div>`;
-        }
-
-        incDiv.innerHTML = html;
     }
 
-    function resolveTrade(tradeId, isAccept) {
-        const t = serverState.trades[tradeId];
+    if (!hasAny) {
+        html = `<div class="text-xs text-gray-500 italic text-center py-4 bg-black/20 rounded border border-white/5">No hay ofertas activas</div>`;
+    }
+
+    incDiv.innerHTML = html;
+}
+
+function resolveTrade(tradeId, isAccept) {
+    const t = serverState.trades[tradeId];
     if (!t) return; // Evita el error de la consola
     
-    if(!isAccept) { 
-        roomRef.child('trades').child(tradeId).update({ status: 'rejected' }); 
-        showCustomAlert("Oferta rechazada."); 
+    if (!accept) { 
+        roomRef.child('trades').child(tradeId).update({status:'rejected'}); 
         return; 
     }
     
@@ -2139,38 +2188,80 @@ if (finalRecs.length === 0)
 function getGrade(player, userId) {
     userId = userId || myUserId;
 
-    // Posiciones que aún necesita el equipo (O(slots), barato)
     const team = (serverState.users[userId] || {}).team || {};
     const starterSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR'];
     const neededPos = new Set();
+    
+    // 1. ¿Qué titulares faltan?
     starterSlots.forEach(s => {
         if (!team[s] || !team[s].id)
             (botPosRules[s] || []).forEach(p => { if (p !== 'ANY') neededPos.add(p); });
     });
 
-    // Score simple O(1) por jugador — sin bucles anidados
+    // 2. Contar cuántos jugadores tiene ya de cada línea (Para penalizar la acumulación absurda)
+    let counts = { GK: 0, CB: 0, FB: 0, CM: 0, WING: 0, ST: 0 };
+    const allSlots = ['DC','EI','ED','MC1','MC2','MC3','DFC1','DFC2','LI','LD','POR','SUB1','SUB2','SUB3','SUB4','SUB5','SUB6','SUB7','SUB8','SUB9'];
+    
+    allSlots.forEach(s => {
+        if (team[s] && team[s].id && team[s].pos) {
+            const p = team[s].pos.split(',').map(x => x.trim().toUpperCase());
+            if (p.includes('GK') || p.includes('POR')) counts.GK++;
+            else if (p.some(x => ['CB','DFC'].includes(x))) counts.CB++;
+            else if (p.some(x => ['LB','RB','LWB','RWB','LI','LD','CAI','CAD'].includes(x))) counts.FB++;
+            else if (p.some(x => ['CM','CDM','CAM','MC','MCD','MCO'].includes(x))) counts.CM++;
+            else if (p.some(x => ['LW','RW','LM','RM','EI','ED','MI','MD'].includes(x))) counts.WING++;
+            else if (p.some(x => ['ST','CF','DC','SD'].includes(x))) counts.ST++;
+        }
+    });
+
+    // 3. Fórmula de puntuación con PENALIZACIONES
     const score = p => {
-        const fits = p.pos.split(',').map(s => s.trim().toUpperCase()).some(pos => neededPos.has(pos));
-        return p.rat * 100 + (fits ? 5000 : 0);
+        const pPos = p.pos.split(',').map(s => s.trim().toUpperCase());
+        const fitsStarter = pPos.some(pos => neededPos.has(pos));
+        
+        let baseScore = p.rat * 100 + (fitsStarter ? 5000 : 0);
+        
+        // Si el jugador no va a ser titular, comprobamos si sobra en el banquillo
+        if (!fitsStarter) {
+            let isGK = pPos.some(x => ['GK','POR'].includes(x));
+            let isCB = pPos.some(x => ['CB','DFC'].includes(x));
+            let isFB = pPos.some(x => ['LB','RB','LWB','RWB','LI','LD','CAI','CAD'].includes(x));
+            let isCM = pPos.some(x => ['CM','CDM','CAM','MC','MCD','MCO'].includes(x));
+            let isWing = pPos.some(x => ['LW','RW','LM','RM','EI','ED','MI','MD'].includes(x));
+            let isST = pPos.some(x => ['ST','CF','DC','SD'].includes(x));
+
+            // LÍMITES JUSTOS: Te permite tener muchos MCs o DFCs, pero te cruje si acumulas GKs
+            if (isGK && counts.GK >= 2) baseScore -= 20000;      // 3er Portero = F instantánea
+            else if (isCB && counts.CB >= 4) baseScore -= 10000; // 5º Central = F
+            else if (isFB && counts.FB >= 4) baseScore -= 10000; // 5º Lateral = F
+            else if (isCM && counts.CM >= 6) baseScore -= 10000; // 7º Medio = F
+            else if (isWing && counts.WING >= 4) baseScore -= 10000; // 5º Extremo = F
+            else if (isST && counts.ST >= 3) baseScore -= 10000; // 4º Delantero Centro = F
+        }
+
+        return baseScore;
     };
 
     const pool = availablePlayers.filter(p => !localTakenPlayers[p.id]);
-    if (pool.length === 0) return { grade: "A+", class: "grade-A" };
+    if (pool.length === 0) return { grade: "S+", class: "grade-Splus" };
 
-    // Asegura que el jugador fichado esté en el pool
     const safePool = pool.find(p => p.id === player.id) ? pool : [...pool, player];
     const pickedScore = score(player);
 
-    // Cuántos jugadores puntúan mejor → rank
+    // Si la puntuación es negativa (se ha comido una penalización de banquillo), recibe una F rotunda
+    if (pickedScore < 0) return { grade: "F", class: "grade-F" };
+
     let rank = 1;
     safePool.forEach(p => { if (score(p) > pickedScore) rank++; });
 
-    // Percentil 0 = mejor pick posible, 1 = peor
     const percentile = (rank - 1) / safePool.length;
 
-    if (percentile <= 0.05) return { grade: "A+", class: "grade-A" };
-    if (percentile <= 0.15) return { grade: "A",  class: "grade-A" };
-    if (percentile <= 0.30) return { grade: "B",  class: "grade-B" };
+    // ESCALA DE NOTAS ACTUALIZADA
+    if (percentile <= 0.01) return { grade: "S+", class: "grade-Splus" }; // Top 1% (El robo del siglo)
+    if (percentile <= 0.04) return { grade: "S",  class: "grade-S" };     // Top 4%
+    if (percentile <= 0.09) return { grade: "A+", class: "grade-A" };
+    if (percentile <= 0.18) return { grade: "A",  class: "grade-A" };
+    if (percentile <= 0.35) return { grade: "B",  class: "grade-B" };
     if (percentile <= 0.55) return { grade: "C",  class: "grade-C" };
     if (percentile <= 0.75) return { grade: "D",  class: "grade-D" };
     return { grade: "F", class: "grade-F" };
@@ -3079,8 +3170,15 @@ function proposeDraftPlayerTrade(targetSlot, targetUid) {
 function resolveDraftTrade(tradeId, accept) {
     const t = serverState.trades[tradeId];
     if (!t) return;
-    if (!accept) { roomRef.child('trades').child(tradeId).update({status:'rejected'}); showCustomAlert("Oferta rechazada."); return; }
+    
+    if (!accept) { 
+        roomRef.child('trades').child(tradeId).update({status:'rejected'}); 
+        showCustomAlert("Oferta rechazada."); 
+        return; 
+    }
+    
     if (t.type === 'player') {
+        // Intercambio de Jugador x Jugador (1x1, no rompe el número de turnos)
         const upd = {};
         upd[`users/${t.from}/team/${t.giveSlot}`] = t.getPlayer;
         upd[`users/${t.to}/team/${t.getSlot}`]     = t.givePlayer;
@@ -3088,15 +3186,38 @@ function resolveDraftTrade(tradeId, accept) {
         roomRef.update(upd);
         pushNews(`🔄 INTERCAMBIO: ${serverState.users[t.from]?.teamName} consigue a ${t.getPlayer.name} · ${serverState.users[t.to]?.teamName} consigue a ${t.givePlayer.name}`);
         showCustomAlert("✅ ¡Intercambio completado!");
+        
     } else {
+        // Intercambio de Picks durante el Draft
         const newOrder = [...serverState.draftOrder];
-        (t.give||[]).forEach(i => newOrder[i] = t.to);
-        (t.get||[]).forEach(i  => newOrder[i] = t.from);
+        const givePicks = t.give || [];
+        const getPicks = t.get || [];
+        
+        // 1. Aplicamos el intercambio principal
+        givePicks.forEach(i => newOrder[i] = t.to);
+        getPicks.forEach(i  => newOrder[i] = t.from);
+
+        // 2. ¡LA COMPENSACIÓN QUE FALTABA!
+        // Comprobamos si alguien ha dado más picks de los que recibe
+        let diff = givePicks.length - getPicks.length; 
+        if (diff !== 0) {
+            let giverUid = diff > 0 ? t.from : t.to;
+            let receiverUid = diff > 0 ? t.to : t.from;
+            let absDiff = Math.abs(diff);
+            
+            // Le quitamos los últimos picks al que tiene de más, y se los damos al que tiene de menos
+            for(let k=0; k<absDiff; k++) {
+                let lastIdx = newOrder.lastIndexOf(receiverUid);
+                if(lastIdx > -1) newOrder[lastIdx] = giverUid;
+            }
+        }
+
+        // 3. Guardamos el nuevo orden en Firebase
         const upd = {};
         upd['draftOrder']               = newOrder;
         upd[`trades/${tradeId}/status`] = 'accepted';
         roomRef.update(upd);
-        pushNews(`🔄 TRADE DE PICKS: ${serverState.users[t.from]?.teamName} ⇄ ${serverState.users[t.to]?.teamName}`);
+        pushNews(`🔄 TRADE DE PICKS EN VIVO: ${serverState.users[t.from]?.teamName} ⇄ ${serverState.users[t.to]?.teamName}`);
         showCustomAlert("✅ ¡Trade de picks aceptado!");
     }
 }
