@@ -2057,10 +2057,13 @@ function pushDraftPickToFirebase(player, slotId, userId) {
     let updates = {};
     updates[`users/${userId}/team/${slotId}`] = player;
     updates[`takenPlayers/${player.id}`] = true;
-    updates[`turnTheme`] = 'theme-confirming';
 
+        // Calculamos la nota y enviamos el objeto "reveal" para disparar la animación
     let gradeInfo = getGrade(player, userId);
     updates[`reveal`] = { player: player, slotId: slotId, userId: userId, pickNum: serverState.currentPickIndex + 1, ts: Date.now(), grade: gradeInfo.grade, gradeClass: gradeInfo.class };
+    
+        // Enviamos el color verde para todos en la sala
+    updates[`turnTheme`] = 'theme-confirming'; 
 
     pendingPlayer = null; pendingSlot = null;
     document.getElementById('pitch-container').classList.remove('highlight-slots');
@@ -2068,11 +2071,12 @@ function pushDraftPickToFirebase(player, slotId, userId) {
     document.getElementById('confirm-banner').classList.add('hidden');
     clearCompatibleHighlights();
 
-        // AQUÍ DISPARAMOS LA NOTICIA AL TICKER CUANDO ALGUIEN FICHA
+        // Mandamos la noticia al Ticker de arriba
     const teamName = serverState.users[userId].teamName;
         const formattedSlot = slotId.replace(/[0-9]/g, ''); // MC1 -> MC
         pushNews(`El mánager de ${teamName} selecciona a ${player.name} (${player.rat}) en la posición de ${formattedSlot}. Nota de Ojeador: ${gradeInfo.grade}`);
 
+        // Actualizamos Firebase
         roomRef.update(updates);
     }
 
@@ -2087,7 +2091,11 @@ function pushDraftPickToFirebase(player, slotId, userId) {
         const posBox = document.getElementById('jumbo-pos');
         const gradeBox = document.getElementById('jumbo-grade');
         
-        jumbo.classList.remove('hidden'); ratBox.classList.add('hidden'); ratBox.classList.remove('animate-scale-in'); posBox.classList.add('opacity-0'); nameBox.innerHTML = '';
+        jumbo.classList.remove('hidden'); 
+        ratBox.classList.add('hidden'); 
+        ratBox.classList.remove('animate-scale-in'); 
+        posBox.classList.add('opacity-0'); 
+        nameBox.innerHTML = '';
         gradeBox.className = "grade-stamp hidden"; 
         
         document.getElementById('jumbo-pick').innerText = '#' + pickNum;
@@ -2096,18 +2104,43 @@ function pushDraftPickToFirebase(player, slotId, userId) {
         document.getElementById('jumbo-pos-text').innerText = slotId.replace(/[0-9]/g, '');
 
         setTimeout(() => {
-            isRevealing = false; jumbo.classList.add('hidden');
-            if(isHost) {
-                const nextPick = serverState.currentPickIndex + 1;
-                if(nextPick >= serverState.draftOrder.length) {
-                    roomRef.update({ status: 'finished', turnTheme: 'theme-default' });
-                } else {
-                            // NUEVO: Resetear el fondo a azul al cambiar de turno
-                    roomRef.update({ currentPickIndex: nextPick, turnEndTime: Date.now() + (turnTime * 1000), turnTheme: 'theme-default' });
-                }
-            }
-            updateDraftUI();
-        }, delay + 4000);
+            ratBox.classList.remove('hidden'); 
+            ratBox.classList.add('animate-scale-in');
+            
+            setTimeout(() => {
+                let delay = 0;
+                player.name.split('').forEach(char => {
+                    const span = document.createElement('span'); 
+                    span.innerHTML = char === ' ' ? '&nbsp;' : char; 
+                    span.className = 'letter'; 
+                    span.style.animation = `fadeInLetter 0.8s ease-out forwards ${delay}ms`;
+                    nameBox.appendChild(span); 
+                    delay += 100;
+                });
+                
+                setTimeout(() => { 
+                    posBox.classList.remove('opacity-0'); 
+                    gradeBox.innerText = grade;
+                    gradeBox.className = `grade-stamp ${gradeClass}`;
+                }, delay + 400);
+                
+                // Aquí termina la animación y reseteamos el turno y el color
+                setTimeout(() => {
+                    isRevealing = false; 
+                    jumbo.classList.add('hidden');
+                    
+                    if(isHost) {
+                        const nextPick = serverState.currentPickIndex + 1;
+                        if(nextPick >= serverState.draftOrder.length) {
+                            roomRef.update({ status: 'finished', turnTheme: 'theme-default' });
+                        } else {
+                            roomRef.update({ currentPickIndex: nextPick, turnEndTime: Date.now() + (turnTime * 1000), turnTheme: 'theme-default' });
+                        }
+                    }
+                    updateDraftUI();
+                }, delay + 4000); 
+            }, 800);
+        }, 500);
     }
 
     // ==========================================
