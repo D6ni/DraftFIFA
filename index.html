@@ -331,9 +331,11 @@ select option {
                 <!-- DERECHA: Centro de Traspasos y Controles -->
                 <div class="w-full lg:w-[380px] flex flex-col gap-4">
                     
-                    <!-- Ofertas Recibidas -->
-                    <div class="glass p-4 flex flex-col max-h-[40%]">
-                        <h3 class="text-base font-black text-green-400 mb-3 border-b border-green-500/30 pb-2 uppercase tracking-wider"><i class="fas fa-inbox mr-2"></i>Ofertas Recibidas</h3>
+                    <!-- Centro de Ofertas (Recibidas y Enviadas) -->
+                    <div class="glass p-4 flex flex-col max-h-[45%]">
+                        <h3 class="text-base font-black text-green-400 mb-3 border-b border-green-500/30 pb-2 uppercase tracking-wider flex justify-between items-center">
+                            <span><i class="fas fa-inbox mr-2"></i>Centro de Ofertas</span>
+                        </h3>
                         <div id="incoming-trades" class="flex flex-col gap-2 overflow-y-auto flex-1 pr-1">
                             <!-- Se rellena con JS -->
                         </div>
@@ -1220,36 +1222,65 @@ function clearTradeSelection() {
 // Actualizamos también cómo se ven las ofertas recibidas si no hay ninguna
 function renderTrades() {
     const incDiv = document.getElementById('incoming-trades');
-    incDiv.innerHTML = '';
+    if (!incDiv) return;
     
-    let hasPending = false;
+    let html = "";
+    let hasAny = false;
 
     if(serverState.trades) {
-        Object.keys(serverState.trades).forEach(tid => {
-            const t = serverState.trades[tid];
-            if(t.status === 'pending' && t.to === myUserId && t.phase !== 'draft') {
-                hasPending = true;
-                const fromUser = serverState.users[t.from].nick;
+        // Filtramos solo las pendientes de la fase de Pre-Draft
+        const pendingTrades = Object.entries(serverState.trades).filter(([id, t]) => t.status === 'pending' && t.phase !== 'draft');
+        
+        const incoming = pendingTrades.filter(([id, t]) => t.to === myUserId);
+        const outgoing = pendingTrades.filter(([id, t]) => t.from === myUserId);
+
+        // 1. Mostrar las recibidas
+        if (incoming.length > 0) {
+            hasAny = true;
+            html += `<div class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 mt-1">Recibidas</div>`;
+            incoming.forEach(([tid, t]) => {
+                const fromUser = serverState.users[t.from]?.nick || 'Desconocido';
                 const giveStr = t.give.map(i => `#${i+1}`).join(', ');
                 const getStr = t.get.map(i => `#${i+1}`).join(', ');
                 
-                incDiv.innerHTML += `
-                    <div class="bg-indigo-900/50 border border-indigo-500/50 p-3 rounded-lg flex flex-col gap-2 shadow-lg">
-                        <div class="text-xs text-gray-200 text-center leading-relaxed">
-                            <span class="font-black text-indigo-300">${fromUser}</span> te ofrece sus picks <b class="text-yellow-400">[${giveStr}]</b> a cambio de tus picks <b class="text-green-400">[${getStr}]</b>
+                html += `
+                    <div class="bg-indigo-900/50 border border-indigo-500/50 p-2.5 rounded-lg flex flex-col gap-2 shadow-lg mb-2">
+                        <div class="text-[11px] text-gray-200 text-center leading-relaxed">
+                            <span class="font-black text-indigo-300">${fromUser}</span> ofrece <b class="text-yellow-400">[${giveStr}]</b> por tus <b class="text-green-400">[${getStr}]</b>
                         </div>
-                        <div class="flex gap-2 mt-1">
+                        <div class="flex gap-2">
                             <button onclick="resolveTrade('${tid}', true)" class="flex-1 bg-green-600 hover:bg-green-500 py-1.5 rounded text-white font-bold text-[10px] uppercase tracking-wider transition">Aceptar</button>
                             <button onclick="resolveTrade('${tid}', false)" class="flex-1 bg-red-600 hover:bg-red-500 py-1.5 rounded text-white font-bold text-[10px] uppercase tracking-wider transition">Rechazar</button>
                         </div>
                 </div>`;
-            }
-        });
+            });
+        }
+
+        // 2. Mostrar las enviadas
+        if (outgoing.length > 0) {
+            hasAny = true;
+            html += `<div class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 mt-3">Enviadas (Pendientes)</div>`;
+            outgoing.forEach(([tid, t]) => {
+                const toUser = serverState.users[t.to]?.nick || 'Desconocido';
+                const giveStr = t.give.map(i => `#${i+1}`).join(', ');
+                const getStr = t.get.map(i => `#${i+1}`).join(', ');
+                
+                html += `
+                    <div class="bg-black/40 border border-white/10 p-2 rounded-lg flex justify-between items-center mb-1.5">
+                        <div class="text-[10px] text-gray-300 leading-tight">
+                            A <b>${toUser}</b>:<br>Das [${giveStr}] ⇄ Pides [${getStr}]
+                        </div>
+                        <button onclick="cancelTrade('${tid}')" class="text-[10px] text-red-400 underline hover:text-red-300 ml-2 bg-red-900/20 px-2 py-1 rounded">Cancelar</button>
+                </div>`;
+            });
+        }
     }
 
-    if (!hasPending) {
-        incDiv.innerHTML = `<div class="text-xs text-gray-500 italic text-center py-4 bg-black/20 rounded border border-white/5">No tienes ofertas pendientes</div>`;
+    if (!hasAny) {
+        html = `<div class="text-xs text-gray-500 italic text-center py-4 bg-black/20 rounded border border-white/5">No hay ofertas activas</div>`;
     }
+
+    incDiv.innerHTML = html;
 }
 
 function updatePreDraftStatusBar() {
@@ -1297,14 +1328,28 @@ function toggleTradePick(type, index) {
     }
 
     function sendTradeOffer() {
-        if(selectedGivePicks.length === 0 || selectedGetPicks.length === 0) return alert("Selecciona al menos 1 pick de cada lado");
+        if(selectedGivePicks.length === 0 || selectedGetPicks.length === 0) return showCustomAlert("Selecciona al menos 1 pick tuyo y 1 del rival.");
 
         const tradeId = "trade_" + Date.now();
-        roomRef.child('trades').child(tradeId).set({ from: myUserId, to: tradeTargetUid, give: selectedGivePicks, get: selectedGetPicks, status: 'pending' });
+    // Lo guardamos en Firebase especificando que es de la fase 'predraft'
+        roomRef.child('trades').child(tradeId).set({ 
+            phase: 'predraft', 
+            from: myUserId, 
+            to: tradeTargetUid, 
+            give: selectedGivePicks, 
+            get: selectedGetPicks, 
+            status: 'pending' 
+        });
         
+    // Limpiamos todo para poder hacer otra oferta inmediatamente
         clearTradeSelection();
-        document.getElementById('trade-panel').classList.add('hidden');
-        showCustomAlert("¡Oferta enviada! Esperando respuesta...");
+        showCustomAlert("¡Oferta enviada!");
+    }
+
+// Nueva función para cancelar ofertas del Pre-Draft
+    function cancelTrade(tradeId) {
+        roomRef.child('trades').child(tradeId).update({ status: 'cancelled' });
+        showCustomAlert("Has cancelado la oferta.");
     }
 
     function renderTrades() {
