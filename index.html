@@ -1465,44 +1465,47 @@ function renderTrades() {
 
 function resolveTrade(tradeId, isAccept) {
     const t = serverState.trades[tradeId];
-    if (!t) return; // Evita el error de la consola
+    if (!t) return; 
     
-    if (!accept) { 
-        roomRef.child('trades').child(tradeId).update({status:'rejected'}); 
+    // 1. Si el usuario RECHAZA la oferta
+    if (!isAccept) { 
+        roomRef.child('trades').child(tradeId).update({ status: 'rejected' }); 
         return; 
     }
     
+    // 2. Si el usuario ACEPTA la oferta
     let newOrder = [...serverState.draftOrder];
-    
-    // Arrays seguros por si vienen vacíos
     const givePicks = t.give || [];
     const getPicks = t.get || [];
     
+    // Aplicamos el intercambio de los turnos
     givePicks.forEach(idx => newOrder[idx] = t.to); 
     getPicks.forEach(idx => newOrder[idx] = t.from);
 
-    // Compensar si el trade es desigual (ej: 2 picks por 1)
+    // COMPENSACIÓN: Si el trade es desigual (ej: das 2 picks por 1)
     let diff = givePicks.length - getPicks.length; 
     if (diff !== 0) {
         let giverUid = diff > 0 ? t.from : t.to;
         let receiverUid = diff > 0 ? t.to : t.from;
         let absDiff = Math.abs(diff);
+        
         for(let k=0; k<absDiff; k++) {
             let lastIdx = newOrder.lastIndexOf(receiverUid);
             if(lastIdx > -1) newOrder[lastIdx] = giverUid;
         }
     }
 
+    // 3. Guardamos el nuevo tablero en Firebase y lo marcamos como aceptado
     roomRef.update({ draftOrder: newOrder });
     roomRef.child('trades').child(tradeId).update({ status: 'accepted' });
-    clearTradeSelection();
+    clearTradeSelection(); // Limpiamos la mesa de negociación
     
+    // 4. Lanzamos la noticia global de que ha habido un bombazo en el mercado
     const uFrom = serverState.users[t.from].teamName;
     const uTo = serverState.users[t.to].teamName;
     const giveStr = givePicks.map(i => `#${i+1}`).join(', ');
     const getStr = getPicks.map(i => `#${i+1}`).join(', ');
     pushNews(`🚨 TRASPASO CONFIRMADO: ${uFrom} envía los picks [${giveStr}] a ${uTo} a cambio de los picks [${getStr}].`);
-    showCustomAlert(`✅ ¡Traspaso aceptado!`);
 }
 
 // Nueva función para cancelar ofertas del Pre-Draft
