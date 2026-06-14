@@ -925,26 +925,38 @@ function listenToServer() {
         localTakenPlayers = data.takenPlayers || {};
         updateNewsTickerUI(data.ticker);
 
-        // NUEVO: Detector de notificaciones de Trades para ambos jugadores
+        // Detector de notificaciones de Trades para ambos jugadores
         if (data.trades) {
             Object.keys(data.trades).forEach(tid => {
                 const t = data.trades[tid];
-                // Si el trade me involucra (soy el que lo envía o el que lo recibe)
+                
+                // Si el trade me involucra a mí
                 if (t.from === myUserId || t.to === myUserId) {
-                    // Y no lo he visto todavía (usamos el window para no repetir popups)
                     if (!window.seenTrades) window.seenTrades = {};
-                    if (!window.seenTrades[tid + t.status] && t.status !== 'pending') {
+                    
+                    // Si no hemos visto esta notificación concreta...
+                    if (!window.seenTrades[tid + t.status]) {
                         
-                        // Dependiendo del estado, mostramos un popup u otro
-                        if (t.status === 'accepted') {
+                        // 1. NUEVA OFERTA RECIBIDA
+                        if (t.status === 'pending' && t.to === myUserId) {
+                            showCustomAlert(`<span class="text-xs text-indigo-300 uppercase tracking-widest block mb-1">¡Nueva Oferta!</span><b class="text-white">${serverState.users[t.from].nick}</b> de <b class="text-indigo-200">${serverState.users[t.from].teamName}</b><br>quiere negociar contigo.`, 'info');
+                            playChatNotification(); // Hace sonar la notificación
+                        } 
+                        // 2. OFERTA ACEPTADA
+                        else if (t.status === 'accepted') {
                             showCustomAlert(`Traspaso con ${serverState.users[t.from === myUserId ? t.to : t.from].nick} COMPLETADO`, 'success');
-                            playChatNotification(); // Opcional: Usamos el sonido del chat para avisar
-                        } else if (t.status === 'rejected') {
+                            playChatNotification(); 
+                        } 
+                        // 3. OFERTA RECHAZADA
+                        else if (t.status === 'rejected' && t.from === myUserId) {
                             showCustomAlert(`${serverState.users[t.to].nick} ha RECHAZADO tu oferta`, 'error');
-                        } else if (t.status === 'cancelled' && t.to === myUserId) {
+                        } 
+                        // 4. OFERTA CANCELADA
+                        else if (t.status === 'cancelled' && t.to === myUserId) {
                             showCustomAlert(`${serverState.users[t.from].nick} ha CANCELADO su oferta`, 'error');
                         }
                         
+                        // Lo marcamos como visto para que no vuelva a saltar
                         window.seenTrades[tid + t.status] = true;
                     }
                 }
@@ -1045,20 +1057,23 @@ function updateNewsTickerUI(tickerArr) {
         const icon = document.getElementById('custom-alert-icon');
         const text = document.getElementById('custom-alert-text');
         
-        text.innerText = msg;
+        // Usamos innerHTML para permitir saltos de línea (<br>) en las ofertas
+        text.innerHTML = msg; 
         
-        // Limpiar clases de color
-        alertBox.className = alertBox.className.replace(/bg-\w+-900\/80/g, '').replace(/border-\w+-400\/50/g, '');
+        // Limpiamos las clases antiguas sin usar regex para evitar fallos
+        alertBox.classList.remove('bg-green-900/50', 'bg-red-900/50', 'bg-indigo-900/50', 'border-green-400/50', 'border-red-400/50', 'border-indigo-400/50');
         
+        // Colores mucho más translúcidos (/50) para un efecto Glassmorphism perfecto
         if (type === 'success') {
-            alertBox.classList.add('bg-green-900/80', 'border-green-400/50');
+            alertBox.classList.add('bg-green-900/50', 'border-green-400/50');
             icon.className = 'fas fa-check-circle text-4xl mb-1 text-green-400 drop-shadow-md';
         } else if (type === 'error') {
-            alertBox.classList.add('bg-red-900/80', 'border-red-400/50');
+            alertBox.classList.add('bg-red-900/50', 'border-red-400/50');
             icon.className = 'fas fa-times-circle text-4xl mb-1 text-red-400 drop-shadow-md';
         } else {
-            alertBox.classList.add('bg-blue-900/80', 'border-blue-400/50');
-            icon.className = 'fas fa-info-circle text-4xl mb-1 text-blue-400 drop-shadow-md';
+            // El color azul/índigo para notificaciones de "Nueva Oferta"
+            alertBox.classList.add('bg-indigo-900/50', 'border-indigo-400/50');
+            icon.className = 'fas fa-bell text-4xl mb-1 text-indigo-400 animate-bounce drop-shadow-md';
         }
 
         // Animación de entrada
@@ -1068,7 +1083,7 @@ function updateNewsTickerUI(tickerArr) {
         setTimeout(() => {
             alertBox.classList.remove('opacity-100', 'scale-100');
             alertBox.classList.add('opacity-0', 'pointer-events-none', 'scale-90');
-        }, 3500); // 3.5 segundos en pantalla
+        }, 4000); // Lo dejamos 4 segundos para que dé tiempo a leerlo bien
     }
 
     function updateLobbyList() {
