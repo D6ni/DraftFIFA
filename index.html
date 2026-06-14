@@ -312,7 +312,7 @@ select option {
 
             <!-- 5. PRE-DRAFT (TRADES) -->
             <div id="predraft-screen" class="hidden w-full max-w-7xl flex-col lg:flex-row gap-6 relative z-10">
-                
+
                 <!-- IZQUIERDA: Tablero de Picks (Con scroll independiente) -->
                 <div class="glass flex-1 flex flex-col overflow-hidden lg:h-[750px]">
                     <div class="p-6 pb-4 border-b border-white/10 flex-shrink-0 bg-black/20">
@@ -330,7 +330,7 @@ select option {
 
                 <!-- DERECHA: Centro de Traspasos y Controles -->
                 <div class="w-full lg:w-[380px] flex flex-col gap-4">
-                    
+
                     <!-- Centro de Ofertas (Recibidas y Enviadas) -->
                     <div class="glass p-4 flex flex-col max-h-[45%]">
                         <h3 class="text-base font-black text-green-400 mb-3 border-b border-green-500/30 pb-2 uppercase tracking-wider flex justify-between items-center">
@@ -1139,12 +1139,12 @@ function updateNewsTickerUI(tickerArr) {
             html += `<div class="mb-4 bg-black/20 p-2 rounded-lg border border-white/5">
             <div class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-2 ml-1">Ronda ${r + 1}</div>
             <div class="flex flex-wrap gap-1.5">`;
-            
+
             for (let i = roundStart; i < roundEnd; i++) {
                 const uid = serverState.draftOrder[i];
                 const u = serverState.users[uid];
                 if (!u) continue;
-                
+
                 const isMe = uid === myUserId;
                 const isBot = u.isBot;
                 const isGive = selectedGivePicks.includes(i);
@@ -1155,7 +1155,7 @@ function updateNewsTickerUI(tickerArr) {
                 : isBot
                 ? 'bg-black/40 border-white/10 text-gray-600 cursor-not-allowed'
                 : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/30';
-                
+
                 let extraClass = '';
                 if (isGive) extraClass = 'predraft-give ring-2 ring-yellow-400';
                 else if (isGet) extraClass = 'predraft-get ring-2 ring-green-400';
@@ -1299,16 +1299,17 @@ function renderTradeButtons(targetUid) {
     const sGet = document.getElementById('trade-get');
     sGive.innerHTML = ''; sGet.innerHTML = '';
 
+    // ¡ESTA ES LA LÍNEA MÁGICA! Si no hay rival seleccionado, no pinta nada y se queda limpio.
+    if (!targetUid) return; 
+
     serverState.draftOrder.forEach((uid, i) => {
         if(uid === myUserId) {
             const isSelected = selectedGivePicks.includes(i);
-                // Color AZUL brillante si está seleccionado
             const colorClass = isSelected ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'bg-black/50 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white';
             sGive.innerHTML += `<div onclick="toggleTradePick('give', ${i})" class="cursor-pointer select-none transition-all duration-200 p-2 text-center text-sm font-bold rounded border ${colorClass}">Pick #${i+1}</div>`;
         }
         if(uid === targetUid) {
             const isSelected = selectedGetPicks.includes(i);
-                // Color VERDE brillante si está seleccionado
             const colorClass = isSelected ? 'bg-green-600 border-green-400 text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-black/50 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white';
             sGet.innerHTML += `<div onclick="toggleTradePick('get', ${i})" class="cursor-pointer select-none transition-all duration-200 p-2 text-center text-sm font-bold rounded border ${colorClass}">Pick #${i+1}</div>`;
         }
@@ -1331,7 +1332,6 @@ function toggleTradePick(type, index) {
         if(selectedGivePicks.length === 0 || selectedGetPicks.length === 0) return showCustomAlert("Selecciona al menos 1 pick tuyo y 1 del rival.");
 
         const tradeId = "trade_" + Date.now();
-    // Lo guardamos en Firebase especificando que es de la fase 'predraft'
         roomRef.child('trades').child(tradeId).set({ 
             phase: 'predraft', 
             from: myUserId, 
@@ -1341,12 +1341,10 @@ function toggleTradePick(type, index) {
             status: 'pending' 
         });
         
-    // Limpiamos todo para poder hacer otra oferta inmediatamente
         clearTradeSelection();
         showCustomAlert("¡Oferta enviada!");
     }
 
-// Nueva función para cancelar ofertas del Pre-Draft
     function cancelTrade(tradeId) {
         roomRef.child('trades').child(tradeId).update({ status: 'cancelled' });
         showCustomAlert("Has cancelado la oferta.");
@@ -1354,112 +1352,169 @@ function toggleTradePick(type, index) {
 
     function renderTrades() {
         const incDiv = document.getElementById('incoming-trades');
-        incDiv.innerHTML = '';
-        if(!serverState.trades) return;
+        if (!incDiv) return;
+        
+        let html = "";
+        let hasAny = false;
 
-        Object.keys(serverState.trades).forEach(tid => {
-            const t = serverState.trades[tid];
-            if(t.status === 'pending' && t.to === myUserId) {
-                const fromUser = serverState.users[t.from].nick;
-                const giveStr = t.give.map(i => `#${i+1}`).join(', ');
-                const getStr = t.get.map(i => `#${i+1}`).join(', ');
-                
-                incDiv.innerHTML += `
-                    <div class="bg-indigo-900/50 border border-indigo-500 p-3 rounded flex justify-between items-center">
-                        <div class="text-sm"><b>${fromUser}</b> ofrece <b>${giveStr}</b> a cambio de tus <b>${getStr}</b></div>
-                        <div class="flex gap-2">
-                            <button onclick="resolveTrade('${tid}', true)" class="bg-green-500 px-3 py-1 rounded text-white font-bold text-xs">Aceptar</button>
-                            <button onclick="resolveTrade('${tid}', false)" class="bg-red-500 px-3 py-1 rounded text-white font-bold text-xs">Rechazar</button>
+        if(serverState.trades) {
+        // Filtramos solo las pendientes de la fase de Pre-Draft
+            const pendingTrades = Object.entries(serverState.trades).filter(([id, t]) => t.status === 'pending' && t.phase !== 'draft');
+            
+            const incoming = pendingTrades.filter(([id, t]) => t.to === myUserId);
+            const outgoing = pendingTrades.filter(([id, t]) => t.from === myUserId);
+
+        // 1. Mostrar las recibidas
+            if (incoming.length > 0) {
+                hasAny = true;
+                html += `<div class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 mt-1">Recibidas</div>`;
+                incoming.forEach(([tid, t]) => {
+                    const fromUser = serverState.users[t.from]?.nick || 'Desconocido';
+                    const giveStr = (t.give || []).map(i => `#${i+1}`).join(', ');
+                    const getStr = (t.get || []).map(i => `#${i+1}`).join(', ');
+                    
+                    html += `
+                    <div class="bg-indigo-900/50 border border-indigo-500/50 p-2.5 rounded-lg flex flex-col gap-2 shadow-lg mb-2">
+                        <div class="text-[11px] text-gray-200 text-center leading-relaxed">
+                            <span class="font-black text-indigo-300">${fromUser}</span> ofrece <b class="text-yellow-400">[${giveStr}]</b> por tus <b class="text-green-400">[${getStr}]</b>
                         </div>
-                </div>`;
+                        <div class="flex gap-2">
+                            <button onclick="resolveTrade('${tid}', true)" class="flex-1 bg-green-600 hover:bg-green-500 py-1.5 rounded text-white font-bold text-[10px] uppercase tracking-wider transition">Aceptar</button>
+                            <button onclick="resolveTrade('${tid}', false)" class="flex-1 bg-red-600 hover:bg-red-500 py-1.5 rounded text-white font-bold text-[10px] uppercase tracking-wider transition">Rechazar</button>
+                        </div>
+                    </div>`;
+                });
             }
-        });
+
+        // 2. Mostrar las enviadas
+            if (outgoing.length > 0) {
+                hasAny = true;
+                html += `<div class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 mt-3">Enviadas (Pendientes)</div>`;
+                outgoing.forEach(([tid, t]) => {
+                    const toUser = serverState.users[t.to]?.nick || 'Desconocido';
+                    const giveStr = (t.give || []).map(i => `#${i+1}`).join(', ');
+                    const getStr = (t.get || []).map(i => `#${i+1}`).join(', ');
+                    
+                    html += `
+                    <div class="bg-black/40 border border-white/10 p-2 rounded-lg flex justify-between items-center mb-1.5">
+                        <div class="text-[10px] text-gray-300 leading-tight">
+                            A <b>${toUser}</b>:<br>Das [${giveStr}] ⇄ Pides [${getStr}]
+                        </div>
+                        <button onclick="cancelTrade('${tid}')" class="text-[10px] text-red-400 underline hover:text-red-300 ml-2 bg-red-900/20 px-2 py-1 rounded">Cancelar</button>
+                    </div>`;
+                });
+            }
+        }
+
+        if (!hasAny) {
+            html = `<div class="text-xs text-gray-500 italic text-center py-4 bg-black/20 rounded border border-white/5">No hay ofertas activas</div>`;
+        }
+
+        incDiv.innerHTML = html;
     }
 
     function resolveTrade(tradeId, isAccept) {
         const t = serverState.trades[tradeId];
-        if(!isAccept) { roomRef.child('trades').child(tradeId).update({ status: 'rejected' }); showCustomAlert("Oferta rechazada."); return; }
-        
-        let newOrder = [...serverState.draftOrder];
-        t.give.forEach(idx => newOrder[idx] = t.to); 
-        t.get.forEach(idx => newOrder[idx] = t.from);
+    if (!t) return; // Evita el error de la consola
+    
+    if(!isAccept) { 
+        roomRef.child('trades').child(tradeId).update({ status: 'rejected' }); 
+        showCustomAlert("Oferta rechazada."); 
+        return; 
+    }
+    
+    let newOrder = [...serverState.draftOrder];
+    
+    // Arrays seguros por si vienen vacíos
+    const givePicks = t.give || [];
+    const getPicks = t.get || [];
+    
+    givePicks.forEach(idx => newOrder[idx] = t.to); 
+    getPicks.forEach(idx => newOrder[idx] = t.from);
 
-        let diff = t.give.length - t.get.length; 
-        if (diff !== 0) {
-            let giverUid = diff > 0 ? t.from : t.to;
-            let receiverUid = diff > 0 ? t.to : t.from;
-            let absDiff = Math.abs(diff);
-            for(let k=0; k<absDiff; k++) {
-                let lastIdx = newOrder.lastIndexOf(receiverUid);
-                if(lastIdx > -1) newOrder[lastIdx] = giverUid;
-            }
+    // Compensar si el trade es desigual (ej: 2 picks por 1)
+    let diff = givePicks.length - getPicks.length; 
+    if (diff !== 0) {
+        let giverUid = diff > 0 ? t.from : t.to;
+        let receiverUid = diff > 0 ? t.to : t.from;
+        let absDiff = Math.abs(diff);
+        for(let k=0; k<absDiff; k++) {
+            let lastIdx = newOrder.lastIndexOf(receiverUid);
+            if(lastIdx > -1) newOrder[lastIdx] = giverUid;
         }
-
-        roomRef.update({ draftOrder: newOrder });
-        roomRef.child('trades').child(tradeId).update({ status: 'accepted' });
-        clearTradeSelection();
-        
-        const uFrom = serverState.users[t.from].teamName;
-        const uTo = serverState.users[t.to].teamName;
-        const giveStr = t.give.map(i => `#${i+1}`).join(', ');
-        const getStr = t.get.map(i => `#${i+1}`).join(', ');
-        pushNews(`🚨 TRASPASO CONFIRMADO: ${uFrom} envía los picks [${giveStr}] a ${uTo} a cambio de los picks [${getStr}].`);
-        showCustomAlert(`✅ ¡Traspaso aceptado!`);
     }
 
-    function endPreDraft() { pushNews("¡ARRANCA EL DRAFT OFICIAL!"); roomRef.update({ status: 'drafting', turnEndTime: Date.now() + (turnTime * 1000) }); }
+    roomRef.update({ draftOrder: newOrder });
+    roomRef.child('trades').child(tradeId).update({ status: 'accepted' });
+    clearTradeSelection();
+    
+    const uFrom = serverState.users[t.from].teamName;
+    const uTo = serverState.users[t.to].teamName;
+    const giveStr = givePicks.map(i => `#${i+1}`).join(', ');
+    const getStr = getPicks.map(i => `#${i+1}`).join(', ');
+    pushNews(`🚨 TRASPASO CONFIRMADO: ${uFrom} envía los picks [${giveStr}] a ${uTo} a cambio de los picks [${getStr}].`);
+    showCustomAlert(`✅ ¡Traspaso aceptado!`);
+}
+
+// Nueva función para cancelar ofertas del Pre-Draft
+function cancelTrade(tradeId) {
+    roomRef.child('trades').child(tradeId).update({ status: 'cancelled' });
+    showCustomAlert("Has cancelado la oferta.");
+}
+
+function endPreDraft() { pushNews("¡ARRANCA EL DRAFT OFICIAL!"); roomRef.update({ status: 'drafting', turnEndTime: Date.now() + (turnTime * 1000) }); }
 
     // ==========================================
     // DRAFTING & UI
     // ==========================================
-    function updateDraftTracker() {
-        const tracker = document.getElementById('draft-tracker');
-        if(!tracker) return;
-        let html = "";
-        serverState.draftOrder.forEach((uid, index) => {
-            if(index < serverState.currentPickIndex) return; 
-            const u = serverState.users[uid];
-            const isActive = index === serverState.currentPickIndex;
-            html += `<div class="flex-shrink-0 px-3 py-1 rounded text-xs border ${isActive ? 'bg-yellow-500 text-black border-yellow-400 font-bold scale-110 shadow-lg' : 'bg-black/50 border-white/20 text-gray-400'}">#${index+1} ${u.nick}</div>`;
-        });
-        tracker.innerHTML = html;
-    }
+function updateDraftTracker() {
+    const tracker = document.getElementById('draft-tracker');
+    if(!tracker) return;
+    let html = "";
+    serverState.draftOrder.forEach((uid, index) => {
+        if(index < serverState.currentPickIndex) return; 
+        const u = serverState.users[uid];
+        const isActive = index === serverState.currentPickIndex;
+        html += `<div class="flex-shrink-0 px-3 py-1 rounded text-xs border ${isActive ? 'bg-yellow-500 text-black border-yellow-400 font-bold scale-110 shadow-lg' : 'bg-black/50 border-white/20 text-gray-400'}">#${index+1} ${u.nick}</div>`;
+    });
+    tracker.innerHTML = html;
+}
 
-    function switchRightTab(tab) {
-        ['agencia','warroom','trades'].forEach(t => {
-            const panel = document.getElementById('panel-' + t);
-            const btn   = document.getElementById('tab-' + t);
-            if (!panel || !btn) return;
-            const active = t === tab;
-            panel.classList.toggle('hidden', !active);
-            panel.classList.toggle('flex',    active);
-        });
-        const styles = {
-            agencia: 'flex-1 py-3 font-bold text-blue-400 border-b-2 border-blue-400',
-            warroom: 'flex-1 py-3 font-bold text-amber-400 border-b-2 border-amber-400',
-            trades:  'flex-1 py-3 font-bold text-green-400 border-b-2 border-green-400'
-        };
-        const off = 'flex-1 py-3 font-bold text-gray-400 hover:text-white transition relative';
-        ['agencia','warroom','trades'].forEach(t => {
-            const btn = document.getElementById('tab-' + t);
-            if (btn) btn.className = (t === tab ? styles[t] : off) + (t === 'trades' ? ' relative' : '');
-        });
-        if (tab === 'warroom') updateAdvisor();
-        if (tab === 'trades')  renderDraftTradesTab();
-    }
+function switchRightTab(tab) {
+    ['agencia','warroom','trades'].forEach(t => {
+        const panel = document.getElementById('panel-' + t);
+        const btn   = document.getElementById('tab-' + t);
+        if (!panel || !btn) return;
+        const active = t === tab;
+        panel.classList.toggle('hidden', !active);
+        panel.classList.toggle('flex',    active);
+    });
+    const styles = {
+        agencia: 'flex-1 py-3 font-bold text-blue-400 border-b-2 border-blue-400',
+        warroom: 'flex-1 py-3 font-bold text-amber-400 border-b-2 border-amber-400',
+        trades:  'flex-1 py-3 font-bold text-green-400 border-b-2 border-green-400'
+    };
+    const off = 'flex-1 py-3 font-bold text-gray-400 hover:text-white transition relative';
+    ['agencia','warroom','trades'].forEach(t => {
+        const btn = document.getElementById('tab-' + t);
+        if (btn) btn.className = (t === tab ? styles[t] : off) + (t === 'trades' ? ' relative' : '');
+    });
+    if (tab === 'warroom') updateAdvisor();
+    if (tab === 'trades')  renderDraftTradesTab();
+}
 
-    function playTurnBeep() {
-        try {
-            const ctx = new AudioContext();
-            const o = ctx.createOscillator();
-            const g = ctx.createGain();
-            o.connect(g); g.connect(ctx.destination);
-            o.frequency.value = 880;
-            g.gain.setValueAtTime(0.3, ctx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-            o.start(); o.stop(ctx.currentTime + 0.4);
-        } catch(e) {}
-    }
+function playTurnBeep() {
+    try {
+        const ctx = new AudioContext();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(0.3, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        o.start(); o.stop(ctx.currentTime + 0.4);
+    } catch(e) {}
+}
 
 let _prevActiveUid = null; // ← también añade esta variable aquí
 
