@@ -63,47 +63,38 @@
             inset: -18%;
             pointer-events: none;
             z-index: -1;
+            /* Ponemos los colores azules fijos aquí: */
             background:
-            radial-gradient(circle at 20% 25%, var(--draft-lava-a) 0 11%, transparent 30%),
-            radial-gradient(circle at 78% 30%, var(--draft-lava-b) 0 10%, transparent 28%),
-            radial-gradient(circle at 48% 78%, var(--draft-lava-c) 0 12%, transparent 33%),
-            radial-gradient(circle at 62% 52%, rgba(255,255,255,0.08) 0 3%, transparent 18%);
-            filter: blur(58px) saturate(135%);
+                radial-gradient(circle at 20% 25%, rgba(40, 40, 170, 0.82) 0 11%, transparent 30%),
+                radial-gradient(circle at 78% 30%, rgba(20, 20, 125, 0.60) 0 10%, transparent 28%),
+                radial-gradient(circle at 48% 78%, rgba(84, 84, 210, 0.42) 0 12%, transparent 33%),
+                radial-gradient(circle at 62% 52%, rgba(255,255,255,0.08) 0 3%, transparent 18%);
+            filter: blur(58px) saturate(135%) hue-rotate(0deg);
             opacity: 0.78;
             transform: translate3d(0,0,0) scale(1.08);
             animation: lavaDrift 24s ease-in-out infinite alternate;
+            
+            /* LA MAGIA: Un fundido suave de 1 segundo para el color */
+            transition: filter 1s ease-in-out;
         }
 
         body::after {
             inset: -24%;
             opacity: 0.32;
-            filter: blur(86px) saturate(150%);
+            filter: blur(86px) saturate(150%) hue-rotate(0deg);
             animation-duration: 34s;
             animation-direction: alternate-reverse;
         }
 
-        @keyframes lavaDrift {
-            0%   { transform: translate3d(-2%, -1%, 0) scale(1.02) rotate(-2deg); }
-            50%  { transform: translate3d(3%, 2%, 0) scale(1.09) rotate(1deg); }
-            100% { transform: translate3d(-1%, 4%, 0) scale(1.05) rotate(-1deg); }
+        /* Para cambiar el color, giramos la rueda cromática suavemente */
+        body.theme-selecting::before, 
+        body.theme-selecting::after {
+            filter: blur(58px) saturate(135%) hue-rotate(75deg); /* Gira hacia el Rosa/Morado */
         }
 
-        body.theme-default {
-            --draft-lava-a: rgba(40, 40, 170, 0.82);
-            --draft-lava-b: rgba(20, 20, 125, 0.60);
-            --draft-lava-c: rgba(84, 84, 210, 0.42);
-        }
-
-        body.theme-selecting {
-            --draft-lava-a: rgba(125, 20, 118, 0.86);
-            --draft-lava-b: rgba(164, 45, 154, 0.66);
-            --draft-lava-c: rgba(81, 14, 76, 0.48);
-        }
-
-        body.theme-confirming {
-            --draft-lava-a: rgba(34, 135, 4, 0.86);
-            --draft-lava-b: rgba(74, 167, 45, 0.64);
-            --draft-lava-c: rgba(18, 84, 2, 0.48);
+        body.theme-confirming::before, 
+        body.theme-confirming::after {
+            filter: blur(58px) saturate(135%) hue-rotate(-110deg); /* Gira hacia el Verde */
         }
 
         .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); border-radius: 16px; }
@@ -1653,11 +1644,10 @@ function renderTabs() {
         const u = serverState.users[uid];
         const b = document.createElement('button');
         
-            // Ajustamos un poco el estilo para que las dos líneas encajen perfectas
-        b.className = `px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition text-center leading-tight ${u.id === viewingUserId ? 'bg-blue-600 text-white shadow-md' : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-gray-200'}`;
+        // AÑADIDO: 'flex-shrink-0' para que nunca se hagan más pequeños de lo que deben
+        b.className = `flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition text-center leading-tight ${u.id === viewingUserId ? 'bg-blue-600 text-white shadow-md' : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-gray-200'}`;
 
-            // Aquí es donde añadimos el salto de línea y el Nick en tamaño mini (text-[9px])
-        b.innerHTML = `${u.teamName}<span class="block text-[9px] font-normal mt-0.5">${u.nick}</span>`; 
+        b.innerHTML = `${u.teamName}<span class="block text-[9px] font-normal opacity-70 mt-0.5">${u.nick}</span>`; 
         
         b.onclick = () => { 
             viewingUserId = u.id; 
